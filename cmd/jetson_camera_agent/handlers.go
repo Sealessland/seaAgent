@@ -65,6 +65,43 @@ func (app *application) handlePeripherals(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, app.observation.InspectPeripherals(r.Context()))
 }
 
+func (app *application) handleAgentCapabilities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, app.observation.AgentCapabilities())
+}
+
+func (app *application) handleAgentChat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req agentChatRequest
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, agentChatResponse{Error: "invalid request body"})
+			return
+		}
+	}
+	if !req.CaptureFresh && !req.UseLatestImage {
+		req.UseLatestImage = true
+	}
+	if !req.IncludeSnapshot {
+		req.IncludeSnapshot = true
+	}
+
+	result, err := app.observation.AgentChat(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, agentChatResponse{Error: err.Error()})
+		return
+	}
+	if result.Error != "" {
+		writeJSON(w, http.StatusBadGateway, result)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (app *application) handleCameraStatus(w http.ResponseWriter, r *http.Request) {
 	result, err := app.observation.InspectPrimary(r.Context())
 	if err != nil {

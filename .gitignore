@@ -2,3 +2,8 @@
 /jetson_camera_agent
 .cache/
 .idea/
+front-end/node_modules/
+front-end/dist/
+front-end/*.tsbuildinfo
+front-end/vite.config.js
+front-end/vite.config.d.ts

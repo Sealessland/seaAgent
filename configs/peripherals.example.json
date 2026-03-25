@@ -1,0 +1,42 @@
+{
+  "primary_capture_device": "front-zed",
+  "devices": [
+    {
+      "name": "front-zed",
+      "kind": "depth_camera",
+      "driver": "zed",
+      "metadata": {
+        "mount": "front",
+        "transport": "usb"
+      },
+      "capture": {
+        "script": "./scripts/capture_zed_frame.py"
+      },
+      "checks": [
+        {
+          "name": "usb",
+          "command": ["bash", "-lc", "lsusb | grep -i zed || true"]
+        }
+      ]
+    },
+    {
+      "name": "front-radar",
+      "kind": "radar",
+      "driver": "exec",
+      "metadata": {
+        "mount": "front",
+        "bus": "can"
+      },
+      "checks": [
+        {
+          "name": "radar_service",
+          "command": ["bash", "-lc", "systemctl is-active my-radar.service 2>/dev/null || true"]
+        },
+        {
+          "name": "radar_topics",
+          "command": ["bash", "-lc", "source /opt/ros/humble/setup.bash >/dev/null 2>&1; ros2 topic list 2>/dev/null | grep radar || true"]
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@ type appConfig struct {
 	Workdir          string
 	CameraScript     string
 	PeripheralConfig string
+	FrontendDistDir  string
 }
 
 func loadConfig() (appConfig, error) {
@@ -39,6 +40,7 @@ func loadConfig() (appConfig, error) {
 		Workdir:          envOrDefault("JETSON_AGENT_WORKDIR", filepath.Join(os.TempDir(), "jetson-camera-agent")),
 		CameraScript:     envOrDefault("JETSON_CAMERA_SCRIPT", "./scripts/capture_zed_frame.py"),
 		PeripheralConfig: envOrDefault("JETSON_PERIPHERAL_CONFIG", "./configs/peripherals.json"),
+		FrontendDistDir:  envOrDefault("JETSON_FRONTEND_DIST_DIR", "./front-end/dist"),
 	}
 
 	if missing := cfg.missingKeys(); len(missing) > 0 {

@@ -1,0 +1,35 @@
+{
+  "primary_capture_device": "front-zed",
+  "devices": [
+    {
+      "name": "front-zed",
+      "kind": "depth_camera",
+      "driver": "zed",
+      "metadata": {
+        "mount": "front",
+        "transport": "usb"
+      },
+      "capture": {
+        "script": "./scripts/capture_zed_frame.py"
+      },
+      "checks": [
+        {
+          "name": "usb",
+          "command": ["bash", "-lc", "lsusb | grep -i zed || true"]
+        },
+        {
+          "name": "ros_topics",
+          "command": ["bash", "-lc", "source /opt/ros/humble/setup.bash >/dev/null 2>&1; source ~/zed_ws/install/setup.bash >/dev/null 2>&1; ros2 topic list 2>/dev/null | grep '^/zed' || true"]
+        },
+        {
+          "name": "zed_log_tail",
+          "command": ["bash", "-lc", "tail -n 40 /tmp/zed_launch.log 2>/dev/null || true"]
+        },
+        {
+          "name": "pyzed_probe",
+          "command": ["python3", "-c", "import pyzed.sl as sl; cam=sl.Camera(); init=sl.InitParameters(); init.camera_resolution=sl.RESOLUTION.HD720; init.camera_fps=15; init.depth_mode=sl.DEPTH_MODE.NONE; print(cam.open(init))"]
+        }
+      ]
+    }
+  ]
+}
