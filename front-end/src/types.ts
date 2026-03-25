@@ -67,6 +67,7 @@ export type AgentCapabilities = {
 };
 
 export type AgentChatRequest = {
+  session_id?: string;
   message: string;
   history: Array<{ role: string; content: string }>;
   capture_fresh?: boolean;
@@ -75,10 +76,40 @@ export type AgentChatRequest = {
 };
 
 export type AgentChatResponse = {
+  session_id?: string;
   reply?: string;
   capture?: CaptureResult;
   peripherals?: FleetSnapshot;
+  sources?: AgentSource[];
+  trace?: AgentTrace;
   error?: string;
+};
+
+export type AgentSource = {
+  id: string;
+  title: string;
+  snippet: string;
+  score: number;
+};
+
+export type AgentAction = {
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+};
+
+export type AgentTrace = {
+  intent: string;
+  actions: AgentAction[];
+  tool_calls?: AgentToolCall[];
+  retrieved_ids: string[];
+};
+
+export type AgentToolCall = {
+  name: string;
+  input?: Record<string, string>;
+  output?: Record<string, string>;
 };
 
 export type ChatMessage = {
@@ -86,6 +117,20 @@ export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
 };
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+};
+
+export type StreamEvent =
+  | { event: "status"; data: { state: string } }
+  | { event: "meta"; data: { session_id: string } }
+  | { event: "delta"; data: { content: string } }
+  | { event: "error"; data: { error: string } }
+  | { event: "done"; data: AgentChatResponse };
 
 export type ActivityLevel = "info" | "success" | "error";
 
