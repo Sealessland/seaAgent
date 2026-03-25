@@ -104,8 +104,8 @@
 <body>
   <main>
     <section class="panel hero">
-      <h1>Jetson Local Camera Agent</h1>
-      <p>这个页面不依赖 webui，也不走浏览器摄像头。它直接让 Jetson 后端去抓 ZED 2i 的一帧，再把这一帧交给本地 Go/Eino agent 调用 vLLM。</p>
+      <h1 id="app-title"></h1>
+      <p id="app-description"></p>
     </section>
 
     <section class="grid">
@@ -118,78 +118,13 @@
       </div>
 
       <div class="panel">
-        <textarea id="prompt">Describe the current camera view and mention anything relevant for robotics or safety.</textarea>
+        <textarea id="prompt" placeholder="等待后端下发默认 prompt…"></textarea>
         <button id="analyze" class="primary">抓帧并交给 Agent</button>
         <pre id="analyze-output">等待操作…</pre>
       </div>
     </section>
   </main>
 
-  <script>
-    const statusEl = document.getElementById("status-output");
-    const analyzeEl = document.getElementById("analyze-output");
-    const promptEl = document.getElementById("prompt");
-    const previewEl = document.getElementById("preview");
-
-    async function getJSON(url, options) {
-      const res = await fetch(url, options);
-      const data = await res.json();
-      return { status: res.status, data };
-    }
-
-    function refreshPreview() {
-      previewEl.src = "/api/camera/latest.jpg?t=" + Date.now();
-    }
-
-    document.getElementById("health").addEventListener("click", async () => {
-      statusEl.textContent = "检查 vLLM 中…";
-      try {
-        const result = await getJSON("/api/health");
-        statusEl.textContent = JSON.stringify(result, null, 2);
-      } catch (err) {
-        statusEl.textContent = err.message;
-      }
-    });
-
-    document.getElementById("status").addEventListener("click", async () => {
-      statusEl.textContent = "检查摄像头状态中…";
-      try {
-        const result = await getJSON("/api/camera/status");
-        statusEl.textContent = JSON.stringify(result, null, 2);
-      } catch (err) {
-        statusEl.textContent = err.message;
-      }
-    });
-
-    document.getElementById("capture").addEventListener("click", async () => {
-      statusEl.textContent = "抓帧中…";
-      try {
-        const result = await getJSON("/api/camera/capture");
-        statusEl.textContent = JSON.stringify(result, null, 2);
-        if (result.status === 200) {
-          refreshPreview();
-        }
-      } catch (err) {
-        statusEl.textContent = err.message;
-      }
-    });
-
-    document.getElementById("analyze").addEventListener("click", async () => {
-      analyzeEl.textContent = "抓帧并调用 agent 中…";
-      try {
-        const result = await getJSON("/api/capture-and-analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: promptEl.value })
-        });
-        analyzeEl.textContent = JSON.stringify(result, null, 2);
-        if (result.data && result.data.capture && result.data.capture.ok) {
-          refreshPreview();
-        }
-      } catch (err) {
-        analyzeEl.textContent = err.message;
-      }
-    });
-  </script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

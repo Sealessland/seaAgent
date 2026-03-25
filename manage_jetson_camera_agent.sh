@@ -2,13 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 BIN_PATH="$ROOT_DIR/jetson_camera_agent"
 LOG_PATH="/tmp/jetson_camera_agent.log"
-LISTEN_ADDR="${JETSON_AGENT_LISTEN_ADDR:-127.0.0.1:18080}"
-BASE_URL="${OPENAI_BASE_URL:-http://127.0.0.1:8000/v1}"
-MODEL_NAME="${OPENAI_MODEL_NAME:-Qwen3.5-2B-local}"
-API_KEY="${OPENAI_API_KEY:-EMPTY}"
 GO_BIN="${GO_BIN:-$HOME/.local/toolchains/go1.23.12/bin/go}"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
+LISTEN_ADDR="${JETSON_AGENT_LISTEN_ADDR:?JETSON_AGENT_LISTEN_ADDR is required}"
+BASE_URL="${OPENAI_BASE_URL:?OPENAI_BASE_URL is required}"
+MODEL_NAME="${OPENAI_MODEL_NAME:?OPENAI_MODEL_NAME is required}"
+API_KEY="${OPENAI_API_KEY:?OPENAI_API_KEY is required}"
 
 build() {
   cd "$ROOT_DIR"

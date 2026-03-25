@@ -1,0 +1,4 @@
+.env
+/jetson_camera_agent
+.cache/
+.idea/
