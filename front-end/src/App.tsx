@@ -2,15 +2,7 @@ import { Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { loadUIConfig, streamAgentChat } from "./api";
-import type {
-  AgentAction,
-  AgentChatResponse,
-  ChatMessage,
-  ConversationSummary,
-  DeviceSnapshot,
-  FleetSnapshot,
-  UIConfig
-} from "./types";
+import type { AgentChatResponse, ChatMessage, ConversationSummary, UIConfig } from "./types";
 
 type AsyncState<T> = {
   loading: boolean;
@@ -57,21 +49,14 @@ export function App() {
   }, [activeConversationId]);
 
   const history = useMemo(
-    () =>
-      messages.map((message) => ({ role: message.role, content: message.content })),
+    () => messages.map((message) => ({ role: message.role, content: message.content })),
     [messages]
   );
   const isBusy = chat.loading;
   const canSend = !isBusy && composer.trim().length > 0;
-  const lastResponse = chat.data;
-  const latestCapture = lastResponse?.capture;
-  const latestFleet = lastResponse?.peripherals;
-  const latestSources = lastResponse?.sources ?? [];
-  const latestTrace = lastResponse?.trace;
-  const messageCount = messages.filter((message) => message.role !== "system").length;
-  const assistantReplies = messages.filter((message) => message.role === "assistant" && message.content.trim()).length;
-  const activeActions = latestTrace?.actions.filter((item) => item.enabled) ?? [];
-  const primaryDevice = latestFleet?.primary_capture_device || latestCapture?.camera_sn || "--";
+  const title = ui.data?.title ?? "Jetson Agent";
+  const subtitle = ui.data?.description ?? "Vision and dialogue";
+  const activeConversation = conversations.find((item) => item.id === activeConversationId);
 
   function startNewConversation() {
     if (isBusy) {
@@ -80,7 +65,10 @@ export function App() {
     const id = `conv-${Date.now()}`;
     setActiveConversationId(id);
     setMessages([]);
-    setConversations((current) => [{ id, title: "New chat", updatedAt: new Date().toISOString(), messages: [] }, ...current]);
+    setConversations((current) => [
+      { id, title: "New chat", updatedAt: new Date().toISOString(), messages: [] },
+      ...current
+    ]);
   }
 
   function openConversation(conversation: ConversationSummary) {
@@ -91,6 +79,13 @@ export function App() {
     setMessages(conversation.messages);
   }
 
+  function applyStarter(text: string) {
+    if (isBusy) {
+      return;
+    }
+    setComposer(text);
+  }
+
   async function sendChat() {
     if (isBusy) {
       return;
@@ -99,8 +94,8 @@ export function App() {
     if (!content) {
       return;
     }
-    const requestHistory = [...history];
 
+    const requestHistory = [...history];
     const userID = `${Date.now()}-user`;
     const assistantID = `${Date.now()}-assistant`;
 
@@ -161,160 +156,89 @@ export function App() {
     }
   }
 
-  const title = ui.data?.title ?? "Jetson Agent Console";
-  const activeConversation = conversations.find((item) => item.id === activeConversationId);
-
   return (
-    <main class="console-shell">
+    <main class="app-shell">
       <aside class="sidebar">
         <div class="sidebar-brand">
-          <p class="eyebrow">Agent</p>
-          <h1>{title}</h1>
-          <p>{ui.data?.description ?? "用于视觉问答、外设状态理解和实时观察的工作台。"}</p>
+          <div class="brand-mark">J</div>
+          <div class="brand-copy">
+            <p class="eyebrow">Agent</p>
+            <h1>{title}</h1>
+          </div>
         </div>
-        <section class="sidebar-metrics">
-          <Metric label="Active Thread" value={activeConversation ? formatCount(messageCount, "turn") : "--"} />
-          <Metric label="Agent Replies" value={String(assistantReplies)} />
-          <Metric label="Primary Input" value={truncate(primaryDevice, 18)} />
-        </section>
-        <button class="accent sidebar-new" onClick={startNewConversation} disabled={isBusy}>新建对话</button>
+        <p class="sidebar-copy">{subtitle}</p>
+        <button class="accent sidebar-new" onClick={startNewConversation} disabled={isBusy}>New chat</button>
+        <div class="index-caption">
+          <span>Recent</span>
+          <strong>{formatCount(conversations.length, "thread")}</strong>
+        </div>
         <div class="conversation-list">
-          {conversations.map((conversation) => (
+          {conversations.map((conversation, index) => (
             <button
               key={conversation.id}
               class={`conversation-item ${conversation.id === activeConversationId ? "conversation-item-active" : ""}`}
               onClick={() => openConversation(conversation)}
               disabled={isBusy}
             >
-              <strong>{conversation.title}</strong>
-              <span>{formatTime(conversation.updatedAt)}</span>
+              <span class="conversation-index">{String(index + 1).padStart(2, "0")}</span>
+              <div class="conversation-copy">
+                <strong>{conversation.title}</strong>
+                <span>{formatTime(conversation.updatedAt)}</span>
+              </div>
             </button>
           ))}
         </div>
       </aside>
 
-      <section class="main-pane main-pane-full">
-        <header class="chat-header workspace-hero">
-          <div class="workspace-copy">
-            <p class="eyebrow">Workspace</p>
+      <section class="main-pane">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Conversation</p>
             <h2>{activeConversation?.title ?? "New chat"}</h2>
-            <p>{isBusy ? "模型正在生成回答，同时会保留会话状态和上下文。" : "从左侧切换会话，在中间完成提问，在右侧查看证据、动作和外设上下文。"}</p>
           </div>
-          <div class="workspace-pulse">
-            <StatusPill tone={isBusy ? "busy" : chat.error ? "error" : "idle"}>
-              {isBusy ? "Streaming" : chat.error ? "Error" : "Ready"}
-            </StatusPill>
-            <div class="workspace-kpis">
-              <Metric label="Sources" value={String(latestSources.length)} />
-              <Metric label="Tool Calls" value={String(latestTrace?.tool_calls?.length ?? 0)} />
-            </div>
-          </div>
+          <StatusPill tone={isBusy ? "busy" : chat.error ? "error" : "idle"}>
+            {isBusy ? "Thinking" : chat.error ? "Unavailable" : "Available"}
+          </StatusPill>
         </header>
 
-        <section class="chat-overview">
-          <div class="overview-block">
-            <span>System Prompt</span>
-            <strong>{truncate(ui.data?.default_prompt ?? "未加载默认提示词", 120)}</strong>
+        <section class="chat-surface">
+          <div class="chat-scroll">
+            <div class="message-list">
+              {messages.length === 0 ? (
+                <EmptyState onSelect={applyStarter} />
+              ) : (
+                messages.map((message) => <ChatBubble key={message.id} message={message} />)
+              )}
+              {chat.loading ? (
+                <div class="message message-assistant message-pending">
+                  <strong>Agent</strong>
+                  <p>Thinking...</p>
+                </div>
+              ) : null}
+            </div>
           </div>
-          <div class="overview-block">
-            <span>Current Intent</span>
-            <strong>{formatIntent(latestTrace?.intent)}</strong>
-          </div>
-          <div class="overview-block">
-            <span>Active Actions</span>
-            <strong>{activeActions.length ? activeActions.map((item) => item.label).join(" / ") : "Waiting for next turn"}</strong>
-          </div>
-        </section>
 
-        <div class="chat-stream">
-          <div class="message-list">
-            {messages.length === 0 ? (
-              <EmptyState />
-            ) : (
-              messages.map((message) => <ChatBubble key={message.id} message={message} />)
-            )}
-            {chat.loading ? (
-              <div class="message message-assistant">
-                <strong>Agent</strong>
-                <p>处理中…</p>
+          <div class="composer composer-dock">
+            <div class="composer-head">
+              <div>
+                <strong>Message</strong>
+                <p>Ask about the scene, device state, or continue the thread.</p>
               </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div class="composer composer-dock">
-          <div class="composer-head">
-            <div>
-              <strong>Ask the agent</strong>
-              <p>默认会附带上下文快照；如果问题涉及当前画面、状态或外设，右侧会同步显示证据。</p>
+              <StatusPill tone={canSend ? "ready" : "idle"}>{canSend ? "Ready" : "Idle"}</StatusPill>
             </div>
-            <StatusPill tone={canSend ? "ready" : "idle"}>{canSend ? "Input ready" : "Waiting"}</StatusPill>
+            <textarea
+              value={composer}
+              onInput={(event) => setComposer((event.target as HTMLTextAreaElement).value)}
+              placeholder={isBusy ? "Agent is responding" : "Message the agent"}
+              disabled={isBusy}
+            />
+            <div class="composer-controls">
+              <button class="ghost" onClick={() => setComposer(ui.data?.default_prompt ?? "")} disabled={isBusy}>Reset</button>
+              <button class="accent" onClick={sendChat} disabled={!canSend}>Send</button>
+            </div>
           </div>
-          <textarea
-            value={composer}
-            onInput={(event) => setComposer((event.target as HTMLTextAreaElement).value)}
-            placeholder={isBusy ? "Agent 正在处理上一条消息" : "输入问题"}
-            disabled={isBusy}
-          />
-          <div class="composer-controls">
-            <button class="accent" onClick={sendChat} disabled={!canSend}>发送</button>
-          </div>
-        </div>
+        </section>
       </section>
-
-      <aside class="inspector">
-        <section class="panel inspector-section">
-          <header class="panel-head">
-            <div>
-              <h2>Response Context</h2>
-              <p>当前回答的推理入口和执行动作。</p>
-            </div>
-          </header>
-          <div class="trace-stack">
-            <div class="trace-block">
-              <span>Intent</span>
-              <strong>{formatIntent(latestTrace?.intent)}</strong>
-            </div>
-            <ActionList actions={latestTrace?.actions ?? []} />
-            <ToolCallList response={lastResponse} />
-          </div>
-        </section>
-
-        <section class="panel inspector-section">
-          <header class="panel-head">
-            <div>
-              <h2>Retrieved Sources</h2>
-              <p>模型回答前拼接进上下文的检索结果。</p>
-            </div>
-          </header>
-          {latestSources.length ? (
-            <div class="source-list">
-              {latestSources.map((source) => (
-                <article class="source-item" key={source.id}>
-                  <div class="source-head">
-                    <strong>{source.title}</strong>
-                    <span>{source.score}</span>
-                  </div>
-                  <p>{source.snippet}</p>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p class="empty">本轮没有命中检索上下文。</p>
-          )}
-        </section>
-
-        <section class="panel inspector-section">
-          <header class="panel-head">
-            <div>
-              <h2>Capture and Devices</h2>
-              <p>最新一轮返回的图像与外设快照。</p>
-            </div>
-          </header>
-          <CapturePanel capture={latestCapture} />
-          <PeripheralPanel fleet={latestFleet} />
-        </section>
-      </aside>
     </main>
   );
 }
@@ -328,21 +252,16 @@ function ChatBubble(props: { message: ChatMessage }) {
   );
 }
 
-function EmptyState() {
+function EmptyState(props: { onSelect: (text: string) => void }) {
   return (
     <section class="empty-state">
-      <p class="eyebrow">Ready</p>
-      <h3>从一个具体观察任务开始。</h3>
-      <p>例如询问当前画面、障碍物、设备状态，或者让 agent 对最新图像和外设信息做交叉判断。</p>
-      <div class="empty-state-grid">
-        <div>
-          <span>Visual reasoning</span>
-          <strong>“看一下前方是否有障碍物。”</strong>
-        </div>
-        <div>
-          <span>Cross-sensor check</span>
-          <strong>“画面和外设状态是否一致？”</strong>
-        </div>
+      <p class="eyebrow">Start Here</p>
+      <h3>Ask naturally. Keep the interface out of the way.</h3>
+      <p>The app is structured like a modern agent product: a lightweight thread rail, a clean conversation surface, and readable answers.</p>
+      <div class="starter-list">
+        <button type="button" class="starter-chip" onClick={() => props.onSelect("Describe the current scene.")}>Describe the current scene</button>
+        <button type="button" class="starter-chip" onClick={() => props.onSelect("Check whether there is any obstacle ahead.")}>Check obstacles ahead</button>
+        <button type="button" class="starter-chip" onClick={() => props.onSelect("Compare the image with the current device status.")}>Compare with device status</button>
       </div>
     </section>
   );
@@ -350,102 +269,6 @@ function EmptyState() {
 
 function StatusPill(props: { tone: "idle" | "busy" | "error" | "ready"; children: ComponentChildren }) {
   return <span class={`status-pill status-pill-${props.tone}`}>{props.children}</span>;
-}
-
-function Metric(props: { label: string; value: string }) {
-  return (
-    <div class="metric">
-      <span>{props.label}</span>
-      <strong>{props.value}</strong>
-    </div>
-  );
-}
-
-function ActionList(props: { actions: AgentAction[] }) {
-  if (props.actions.length === 0) {
-    return <p class="empty">本轮还没有动作轨迹。</p>;
-  }
-
-  return (
-    <div class="trace-action-list">
-      {props.actions.map((action) => (
-        <div class={`trace-chip ${action.enabled ? "trace-chip-on" : ""}`} key={action.id}>
-          <strong>{action.label}</strong>
-          <span>{action.description}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ToolCallList(props: { response: AgentChatResponse | null }) {
-  const toolCalls = props.response?.trace?.tool_calls ?? [];
-  if (toolCalls.length === 0) {
-    return <p class="empty">没有发生工具调用。</p>;
-  }
-
-  return (
-    <div class="tool-call-list">
-      {toolCalls.map((call, index) => (
-        <article class="trace-block" key={`${call.name}-${index}`}>
-          <div class="source-head">
-            <strong>{call.name}</strong>
-            <span>tool</span>
-          </div>
-          <pre>{JSON.stringify({ input: call.input, output: call.output }, null, 2)}</pre>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function CapturePanel(props: { capture: AgentChatResponse["capture"] }) {
-  if (!props.capture) {
-    return <p class="empty">当前没有新的捕获结果。</p>;
-  }
-
-  return (
-    <div class="capture-stack">
-      <div class="trace-block">
-        <span>Capture Status</span>
-        <strong>{props.capture.ok ? "ready" : "degraded"}</strong>
-      </div>
-      <div class="capture-grid">
-        <Metric label="Resolution" value={props.capture.width && props.capture.height ? `${props.capture.width}×${props.capture.height}` : "--"} />
-        <Metric label="Camera" value={props.capture.camera_sn || "--"} />
-      </div>
-      {props.capture.output ? <p class="path-note">{props.capture.output}</p> : null}
-      {props.capture.error ? <p class="error-note">{props.capture.error}</p> : null}
-    </div>
-  );
-}
-
-function PeripheralPanel(props: { fleet: FleetSnapshot | null | undefined }) {
-  const devices = props.fleet?.devices ?? [];
-  if (devices.length === 0) {
-    return <p class="empty">当前没有附带外设快照。</p>;
-  }
-
-  return (
-    <div class="compact-device-list">
-      {devices.map((device) => <CompactDevice key={device.name} device={device} />)}
-    </div>
-  );
-}
-
-function CompactDevice(props: { device: DeviceSnapshot }) {
-  return (
-    <article class="device compact-device">
-      <div class="device-head">
-        <div>
-          <p class="device-kind">{props.device.kind}</p>
-          <h3>{props.device.name}</h3>
-        </div>
-        <span>{props.device.driver}</span>
-      </div>
-      <p class="device-summary">{props.device.summary}</p>
-    </article>
-  );
 }
 
 function upsertConversation(current: ConversationSummary[], activeId: string, messages: ChatMessage[]) {
@@ -474,25 +297,8 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatIntent(intent?: string) {
-  if (!intent) {
-    return "Not inferred yet";
-  }
-  return intent
-    .split("_")
-    .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
-    .join(" ");
-}
-
 function formatCount(count: number, label: string) {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
-}
-
-function truncate(text: string, max: number) {
-  if (text.length <= max) {
-    return text;
-  }
-  return `${text.slice(0, max - 1)}…`;
 }
 
 function renderFormattedMessage(content: string): ComponentChildren {
@@ -512,11 +318,7 @@ function renderFormattedMessage(content: string): ComponentChildren {
     if (paragraph.length === 0) {
       return;
     }
-    blocks.push(
-      <p class="message-paragraph">
-        {renderInline(paragraph.join(" "))}
-      </p>
-    );
+    blocks.push(<p class="message-paragraph">{renderInline(paragraph.join(" "))}</p>);
     paragraph = [];
   };
 
@@ -526,9 +328,7 @@ function renderFormattedMessage(content: string): ComponentChildren {
     }
     blocks.push(
       <ul class="message-list-block">
-        {listItems.map((item) => (
-          <li>{renderInline(item)}</li>
-        ))}
+        {listItems.map((item) => <li>{renderInline(item)}</li>)}
       </ul>
     );
     listItems = [];
