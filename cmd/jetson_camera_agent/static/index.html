@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jetson Camera Agent</title>
+  <style>
+    :root {
+      --bg: #efe7da;
+      --panel: rgba(255, 251, 244, 0.88);
+      --line: #151411;
+      --accent: #1f6b59;
+      --muted: #5c564f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans SC", sans-serif;
+      color: #171612;
+      background:
+        radial-gradient(circle at top left, #fff0cf 0%, transparent 25%),
+        linear-gradient(135deg, #e9e2d2 0%, #d5e5df 52%, #f4ecdf 100%);
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 18px 40px;
+      display: grid;
+      gap: 18px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 10px 10px 0 rgba(21, 20, 17, 0.08);
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: 1;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: 1fr 1fr;
+    }
+    .preview {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: #0f0f0f;
+      margin-top: 14px;
+    }
+    button, textarea {
+      font: inherit;
+    }
+    button {
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: white;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button.primary {
+      background: var(--accent);
+      color: white;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 14px;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: #fffef9;
+      resize: vertical;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 180px;
+      background: #111;
+      color: #f5f0e7;
+      border-radius: 18px;
+      padding: 14px;
+      margin: 14px 0 0;
+      overflow: auto;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel hero">
+      <h1>Jetson Local Camera Agent</h1>
+      <p>这个页面不依赖 webui，也不走浏览器摄像头。它直接让 Jetson 后端去抓 ZED 2i 的一帧，再把这一帧交给本地 Go/Eino agent 调用 vLLM。</p>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <button id="health" class="primary">检查 vLLM</button>
+        <button id="status">检查摄像头状态</button>
+        <button id="capture">只抓一帧</button>
+        <img id="preview" class="preview" alt="latest capture preview">
+        <pre id="status-output">等待操作…</pre>
+      </div>
+
+      <div class="panel">
+        <textarea id="prompt">Describe the current camera view and mention anything relevant for robotics or safety.</textarea>
+        <button id="analyze" class="primary">抓帧并交给 Agent</button>
+        <pre id="analyze-output">等待操作…</pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById("status-output");
+    const analyzeEl = document.getElementById("analyze-output");
+    const promptEl = document.getElementById("prompt");
+    const previewEl = document.getElementById("preview");
+
+    async function getJSON(url, options) {
+      const res = await fetch(url, options);
+      const data = await res.json();
+      return { status: res.status, data };
+    }
+
+    function refreshPreview() {
+      previewEl.src = "/api/camera/latest.jpg?t=" + Date.now();
+    }
+
+    document.getElementById("health").addEventListener("click", async () => {
+      statusEl.textContent = "检查 vLLM 中…";
+      try {
+        const result = await getJSON("/api/health");
+        statusEl.textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    });
+
+    document.getElementById("status").addEventListener("click", async () => {
+      statusEl.textContent = "检查摄像头状态中…";
+      try {
+        const result = await getJSON("/api/camera/status");
+        statusEl.textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    });
+
+    document.getElementById("capture").addEventListener("click", async () => {
+      statusEl.textContent = "抓帧中…";
+      try {
+        const result = await getJSON("/api/camera/capture");
+        statusEl.textContent = JSON.stringify(result, null, 2);
+        if (result.status === 200) {
+          refreshPreview();
+        }
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    });
+
+    document.getElementById("analyze").addEventListener("click", async () => {
+      analyzeEl.textContent = "抓帧并调用 agent 中…";
+      try {
+        const result = await getJSON("/api/capture-and-analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: promptEl.value })
+        });
+        analyzeEl.textContent = JSON.stringify(result, null, 2);
+        if (result.data && result.data.capture && result.data.capture.ok) {
+          refreshPreview();
+        }
+      } catch (err) {
+        analyzeEl.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>
