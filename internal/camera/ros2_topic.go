@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -54,6 +56,7 @@ func buildROS2CaptureCommand(cfg ROS2TopicCaptureConfig, outputPath string) stri
 		if trimmed == "" {
 			continue
 		}
+		trimmed = ExpandHomePath(trimmed)
 		builder.WriteString("source ")
 		builder.WriteString(shellQuote(trimmed))
 		builder.WriteString(" >/dev/null 2>&1; ")
@@ -79,6 +82,17 @@ func buildROS2CaptureCommand(cfg ROS2TopicCaptureConfig, outputPath string) stri
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
+}
+
+func ExpandHomePath(path string) string {
+	if !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return path
+	}
+	return filepath.Join(home, strings.TrimPrefix(path, "~/"))
 }
 
 func ValidateROS2TopicCaptureConfig(cfg ROS2TopicCaptureConfig) error {

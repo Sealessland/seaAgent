@@ -1,0 +1,26 @@
+{
+  "primary_capture_device": "front-camera-ros2-zed",
+  "devices": [
+    {
+      "name": "front-camera-ros2-zed",
+      "kind": "rgb_camera",
+      "driver": "ros2_topic",
+      "metadata": {
+        "mount": "front",
+        "transport": "ros2",
+        "source": "zed_wrapper"
+      },
+      "capture": {
+        "script": "./scripts/capture_ros2_topic_image.py",
+        "topic": "/zed/zed_node/rgb/color/rect/image",
+        "message_type": "sensor_msgs/msg/Image",
+        "encoding": "bgr8",
+        "timeout_seconds": 5,
+        "ros_setup": [
+          "/opt/ros/humble/setup.bash",
+          "~/zed_ws/install/setup.bash"
+        ]
+      }
+    }
+  ]
+}

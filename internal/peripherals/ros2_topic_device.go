@@ -153,6 +153,7 @@ func ros2ShellCommand(setup []string, body string) []string {
 		if trimmed == "" {
 			continue
 		}
+		trimmed = camera.ExpandHomePath(trimmed)
 		builder.WriteString("source ")
 		builder.WriteString(shellQuote(trimmed))
 		builder.WriteString(" >/dev/null 2>&1; ")
