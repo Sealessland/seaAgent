@@ -16,7 +16,7 @@ import (
 	"eino-vlm-agent-demo/internal/peripherals"
 )
 
-//go:embed static
+//go:embed static debug_static
 var staticFS embed.FS
 
 type application struct {
@@ -25,7 +25,7 @@ type application struct {
 	healthCheck *http.Client
 }
 
-func newServer(cfg appConfig) (*http.Server, error) {
+func newApplication(cfg appConfig) (*application, error) {
 	if err := os.MkdirAll(cfg.Workdir, 0o755); err != nil {
 		return nil, err
 	}
@@ -36,10 +36,11 @@ func newServer(cfg appConfig) (*http.Server, error) {
 	}
 
 	visionAgent, err := agent.NewVisionAgent(context.Background(), agent.Config{
-		BaseURL:      cfg.BaseURL,
-		APIKey:       cfg.APIKey,
-		Model:        cfg.ModelName,
-		SystemPrompt: cfg.SystemPrompt,
+		BaseURL:          cfg.BaseURL,
+		APIKey:           cfg.APIKey,
+		Model:            cfg.ModelName,
+		EnableImageInput: cfg.EnableImageInput,
+		SystemPrompt:     cfg.SystemPrompt,
 	})
 	if err != nil {
 		return nil, err
@@ -47,15 +48,31 @@ func newServer(cfg appConfig) (*http.Server, error) {
 
 	app := &application{
 		cfg:         cfg,
-		observation: NewObservationService(cfg.Workdir, cfg.DefaultPrompt, peripheralsManager, visionAgent),
 		healthCheck: &http.Client{Timeout: 15 * time.Second},
 	}
+	observation, err := NewObservationService(cfg.Workdir, cfg.DefaultPrompt, cfg.EnableImageInput, peripheralsManager, visionAgent)
+	if err != nil {
+		return nil, err
+	}
+	app.observation = observation
 
+	return app, nil
+}
+
+func (app *application) newAPIServer() *http.Server {
 	return &http.Server{
-		Addr:              cfg.ListenAddr,
+		Addr:              app.cfg.ListenAddr,
 		Handler:           loggingMiddleware(app.routes()),
 		ReadHeaderTimeout: 10 * time.Second,
-	}, nil
+	}
+}
+
+func (app *application) newDebugServer() *http.Server {
+	return &http.Server{
+		Addr:              app.cfg.DebugListenAddr,
+		Handler:           loggingMiddleware(app.debugRoutes()),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 }
 
 func (app *application) routes() http.Handler {
@@ -65,7 +82,9 @@ func (app *application) routes() http.Handler {
 	mux.HandleFunc("/api/health", app.handleHealth)
 	mux.HandleFunc("/api/agent/capabilities", app.handleAgentCapabilities)
 	mux.HandleFunc("/api/agent/chat", app.handleAgentChat)
+	mux.HandleFunc("/api/agent/chat/stream", app.handleAgentChatStream)
 	mux.HandleFunc("/api/peripherals", app.handlePeripherals)
+	mux.HandleFunc("/api/peripherals/stream", app.handlePeripheralStream)
 	mux.HandleFunc("/api/camera/status", app.handleCameraStatus)
 	mux.HandleFunc("/api/camera/capture", app.handleCameraCapture)
 	mux.HandleFunc("/api/camera/latest.jpg", app.handleLatestCapture)
@@ -73,11 +92,25 @@ func (app *application) routes() http.Handler {
 	return mux
 }
 
+func (app *application) debugRoutes() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/", app.debugFrontendHandler())
+	mux.HandleFunc("/api/config", app.handleUIConfig)
+	mux.HandleFunc("/api/health", app.handleHealth)
+	mux.HandleFunc("/api/peripherals", app.handlePeripherals)
+	mux.HandleFunc("/api/peripherals/stream", app.handlePeripheralStream)
+	mux.HandleFunc("/api/camera/status", app.handleCameraStatus)
+	mux.HandleFunc("/api/camera/latest.jpg", app.handleLatestCapture)
+	return mux
+}
+
 func logStartup(cfg appConfig) {
 	log.Printf("jetson camera agent listening on http://%s", cfg.ListenAddr)
+	log.Printf("jetson peripheral debug listening on http://%s", cfg.DebugListenAddr)
 	log.Printf("target VLM endpoint: %s, model: %s", cfg.BaseURL, cfg.ModelName)
 	log.Printf("peripheral config: %s", cfg.PeripheralConfig)
 	log.Printf("frontend dist dir: %s", cfg.FrontendDistDir)
+	log.Printf("debug dist dir: %s", cfg.DebugDistDir)
 }
 
 func loadPeripheralManager(cfg appConfig) (*peripherals.Manager, error) {
@@ -97,6 +130,20 @@ func (app *application) frontendHandler() http.Handler {
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "static assets unavailable", http.StatusInternalServerError)
+		})
+	}
+	return spaFileServer(staticContent)
+}
+
+func (app *application) debugFrontendHandler() http.Handler {
+	if info, err := os.Stat(app.cfg.DebugDistDir); err == nil && info.IsDir() {
+		return spaFileServer(os.DirFS(app.cfg.DebugDistDir))
+	}
+
+	staticContent, err := fs.Sub(staticFS, "debug_static")
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "debug frontend unavailable", http.StatusInternalServerError)
 		})
 	}
 	return spaFileServer(staticContent)

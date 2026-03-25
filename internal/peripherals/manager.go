@@ -71,6 +71,14 @@ func (m *Manager) InspectPrimary(ctx context.Context) (DeviceSnapshot, error) {
 	return device.Inspect(ctx), nil
 }
 
+func (m *Manager) InspectDevice(ctx context.Context, name string) (DeviceSnapshot, error) {
+	device, err := m.deviceByName(name)
+	if err != nil {
+		return DeviceSnapshot{}, err
+	}
+	return device.Inspect(ctx), nil
+}
+
 func (m *Manager) CapturePrimary(ctx context.Context, outputPath string) (*CaptureResult, error) {
 	device, err := m.primaryDevice()
 	if err != nil {
@@ -84,14 +92,31 @@ func (m *Manager) CapturePrimary(ctx context.Context, outputPath string) (*Captu
 	return captureDevice.Capture(ctx, outputPath)
 }
 
+func (m *Manager) CaptureDevice(ctx context.Context, name string, outputPath string) (*CaptureResult, error) {
+	device, err := m.deviceByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	captureDevice, ok := device.(CaptureDevice)
+	if !ok {
+		return nil, fmt.Errorf("device %q does not support capture", device.Descriptor().Name)
+	}
+	return captureDevice.Capture(ctx, outputPath)
+}
+
 func (m *Manager) primaryDevice() (Device, error) {
 	if m.primaryCapture == "" {
 		return nil, fmt.Errorf("no primary capture device configured")
 	}
 
-	device, ok := m.devices[m.primaryCapture]
+	return m.deviceByName(m.primaryCapture)
+}
+
+func (m *Manager) deviceByName(name string) (Device, error) {
+	device, ok := m.devices[name]
 	if !ok {
-		return nil, fmt.Errorf("primary capture device %q is unavailable", m.primaryCapture)
+		return nil, fmt.Errorf("device %q is unavailable", name)
 	}
 	return device, nil
 }
@@ -100,6 +125,8 @@ func newDevice(cfg DeviceConfig) (Device, error) {
 	switch cfg.Driver {
 	case "zed":
 		return newZEDDevice(cfg)
+	case "ros2_topic":
+		return newROS2TopicDevice(cfg)
 	default:
 		return newExecDevice(cfg)
 	}

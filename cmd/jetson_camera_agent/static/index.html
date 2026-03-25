@@ -3,128 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jetson Camera Agent</title>
+  <title>Frontend Build Missing</title>
   <style>
-    :root {
-      --bg: #efe7da;
-      --panel: rgba(255, 251, 244, 0.88);
-      --line: #151411;
-      --accent: #1f6b59;
-      --muted: #5c564f;
-    }
-    * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Noto Sans SC", sans-serif;
-      color: #171612;
-      background:
-        radial-gradient(circle at top left, #fff0cf 0%, transparent 25%),
-        linear-gradient(135deg, #e9e2d2 0%, #d5e5df 52%, #f4ecdf 100%);
+      display: grid;
+      place-items: center;
+      font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      background: #0d1026;
+      color: #edf4ff;
     }
     main {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 28px 18px 40px;
-      display: grid;
-      gap: 18px;
+      width: min(640px, calc(100vw - 32px));
+      border: 1px solid rgba(122, 108, 255, 0.26);
+      border-radius: 20px;
+      padding: 24px;
+      background: rgba(19, 21, 48, 0.84);
     }
-    .panel {
-      background: var(--panel);
-      border: 2px solid var(--line);
-      border-radius: 24px;
-      padding: 18px;
-      box-shadow: 10px 10px 0 rgba(21, 20, 17, 0.08);
-    }
-    .hero h1 {
-      margin: 0 0 8px;
-      font-size: clamp(28px, 4vw, 48px);
-      line-height: 1;
-    }
-    .hero p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    .grid {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: 1fr 1fr;
-    }
-    .preview {
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      object-fit: contain;
-      border: 2px solid var(--line);
-      border-radius: 18px;
-      background: #0f0f0f;
-      margin-top: 14px;
-    }
-    button, textarea {
-      font: inherit;
-    }
-    button {
-      border: 2px solid var(--line);
-      border-radius: 999px;
-      padding: 10px 16px;
-      background: white;
-      cursor: pointer;
-      margin-right: 8px;
-      margin-bottom: 8px;
-    }
-    button.primary {
-      background: var(--accent);
-      color: white;
-    }
-    textarea {
-      width: 100%;
-      min-height: 120px;
-      padding: 14px;
-      border: 2px solid var(--line);
-      border-radius: 18px;
-      background: #fffef9;
-      resize: vertical;
-    }
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      min-height: 180px;
-      background: #111;
-      color: #f5f0e7;
-      border-radius: 18px;
-      padding: 14px;
-      margin: 14px 0 0;
-      overflow: auto;
-    }
-    @media (max-width: 900px) {
-      .grid { grid-template-columns: 1fr; }
-    }
+    p { color: #a9b1dd; line-height: 1.6; }
+    code { color: #8dc9ff; }
   </style>
 </head>
 <body>
   <main>
-    <section class="panel hero">
-      <h1 id="app-title"></h1>
-      <p id="app-description"></p>
-    </section>
-
-    <section class="grid">
-      <div class="panel">
-        <button id="health" class="primary">检查 vLLM</button>
-        <button id="status">检查摄像头状态</button>
-        <button id="capture">只抓一帧</button>
-        <img id="preview" class="preview" alt="latest capture preview">
-        <pre id="status-output">等待操作…</pre>
-      </div>
-
-      <div class="panel">
-        <textarea id="prompt" placeholder="等待后端下发默认 prompt…"></textarea>
-        <button id="analyze" class="primary">抓帧并交给 Agent</button>
-        <pre id="analyze-output">等待操作…</pre>
-      </div>
-    </section>
+    <h1>Frontend Build Missing</h1>
+    <p>主前端已经迁移到独立的现代前端工程。</p>
+    <p>请先构建 <code>front-end/dist</code>，或运行对应的 dev server。</p>
   </main>
-
-  <script type="module" src="/app.js"></script>
 </body>
 </html>

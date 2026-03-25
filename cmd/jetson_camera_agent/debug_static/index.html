@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jetson Peripheral Debug</title>
+  <style>
+    :root {
+      --bg: #07111e;
+      --panel: rgba(15, 28, 48, 0.84);
+      --line: rgba(112, 196, 255, 0.22);
+      --ink: #e7f2ff;
+      --muted: #9bb6d1;
+      --accent: #55d0ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(85, 208, 255, 0.16), transparent 24%),
+        linear-gradient(160deg, #06101b 0%, #0a1830 55%, #081423 100%);
+    }
+    main {
+      width: min(1440px, calc(100vw - 24px));
+      margin: 0 auto;
+      padding: 12px 0 24px;
+      display: grid;
+      gap: 12px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 14px;
+      background: var(--panel);
+    }
+    .hero, .grid {
+      display: grid;
+      gap: 12px;
+    }
+    .hero {
+      grid-template-columns: 1.2fr 1fr;
+    }
+    .grid {
+      grid-template-columns: 1.05fr 1fr;
+    }
+    .stats {
+      display: grid;
+      gap: 10px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+    }
+    pre {
+      margin: 0;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow: auto;
+      min-height: 220px;
+    }
+    img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #02060b;
+    }
+    .devices { display: grid; gap: 10px; }
+    .device {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 960px) {
+      .hero, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="panel">
+        <div class="muted">Debug Console</div>
+        <h1 id="title">Jetson Peripheral Debug</h1>
+        <p id="description" class="muted">实时观测各外设传入数据、主设备状态和最新图像。</p>
+      </div>
+      <div class="panel stats">
+        <div class="stat"><div class="muted">Last update</div><strong id="updated-at">--</strong></div>
+        <div class="stat"><div class="muted">Primary capture device</div><strong id="primary-device">--</strong></div>
+        <div class="stat"><div class="muted">Health</div><strong id="health-state">--</strong></div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="head">
+          <strong>Latest Frame</strong>
+          <span class="muted">auto refresh</span>
+        </div>
+        <img id="preview" alt="latest capture preview">
+      </div>
+      <div class="panel">
+        <div class="head">
+          <strong>Health Payload</strong>
+          <span class="muted">vLLM / primary device</span>
+        </div>
+        <pre id="health-output">waiting…</pre>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">
+        <strong>Peripheral Feed</strong>
+        <span class="muted">Server-Sent Events</span>
+      </div>
+      <div id="devices" class="devices"></div>
+    </section>
+  </main>
+
+  <script>
+    const titleEl = document.getElementById("title");
+    const descriptionEl = document.getElementById("description");
+    const updatedAtEl = document.getElementById("updated-at");
+    const primaryDeviceEl = document.getElementById("primary-device");
+    const healthStateEl = document.getElementById("health-state");
+    const healthOutputEl = document.getElementById("health-output");
+    const devicesEl = document.getElementById("devices");
+    const previewEl = document.getElementById("preview");
+
+    async function requestJSON(url) {
+      const response = await fetch(url);
+      return response.json();
+    }
+
+    async function loadConfig() {
+      const config = await requestJSON("/api/config");
+      titleEl.textContent = config.title + " Debug";
+      descriptionEl.textContent = "实时观测各外设传入数据、主设备状态和最新图像。";
+    }
+
+    async function refreshHealth() {
+      const [health, primary] = await Promise.all([
+        requestJSON("/api/health"),
+        requestJSON("/api/camera/status").catch(() => ({ error: "primary device unavailable" }))
+      ]);
+      healthStateEl.textContent = health.ok ? "vLLM ready" : "degraded";
+      healthOutputEl.textContent = JSON.stringify({ health, primary }, null, 2);
+    }
+
+    function refreshPreview() {
+      previewEl.src = "/api/camera/latest.jpg?t=" + Date.now();
+    }
+
+    function renderDevices(snapshot) {
+      primaryDeviceEl.textContent = snapshot.primary_capture_device || "--";
+      updatedAtEl.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+      devicesEl.innerHTML = "";
+      snapshot.devices.forEach((device) => {
+        const element = document.createElement("article");
+        element.className = "device";
+        element.innerHTML = `
+          <div class="head">
+            <div>
+              <div class="muted">${device.kind}</div>
+              <strong>${device.name}</strong>
+            </div>
+            <span class="muted">${device.driver}</span>
+          </div>
+          <p>${device.summary}</p>
+          <pre>${JSON.stringify({ metadata: device.metadata, checks: device.checks }, null, 2)}</pre>
+        `;
+        devicesEl.appendChild(element);
+      });
+    }
+
+    function startStream() {
+      const source = new EventSource("/api/peripherals/stream");
+      source.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        renderDevices(payload);
+        refreshPreview();
+      };
+      source.onerror = () => {
+        source.close();
+        setTimeout(startStream, 1500);
+      };
+    }
+
+    loadConfig();
+    refreshHealth();
+    refreshPreview();
+    startStream();
+    setInterval(refreshHealth, 3000);
+    setInterval(refreshPreview, 2500);
+  </script>
+</body>
+</html>

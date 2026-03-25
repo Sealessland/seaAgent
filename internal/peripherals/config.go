@@ -21,8 +21,13 @@ type DeviceConfig struct {
 }
 
 type CaptureConfig struct {
-	Script  string   `json:"script,omitempty"`
-	Command []string `json:"command,omitempty"`
+	Script         string   `json:"script,omitempty"`
+	Command        []string `json:"command,omitempty"`
+	Topic          string   `json:"topic,omitempty"`
+	MessageType    string   `json:"message_type,omitempty"`
+	Encoding       string   `json:"encoding,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+	ROSSetup       []string `json:"ros_setup,omitempty"`
 }
 
 type CheckConfig struct {

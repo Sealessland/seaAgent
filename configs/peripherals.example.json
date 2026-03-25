@@ -37,6 +37,26 @@
           "command": ["bash", "-lc", "source /opt/ros/humble/setup.bash >/dev/null 2>&1; ros2 topic list 2>/dev/null | grep radar || true"]
         }
       ]
+    },
+    {
+      "name": "front-camera-ros2",
+      "kind": "rgb_camera",
+      "driver": "ros2_topic",
+      "metadata": {
+        "mount": "front",
+        "transport": "ros2"
+      },
+      "capture": {
+        "script": "./scripts/capture_ros2_topic_image.py",
+        "topic": "/front_camera/image_raw/compressed",
+        "message_type": "sensor_msgs/msg/CompressedImage",
+        "encoding": "bgr8",
+        "timeout_seconds": 5,
+        "ros_setup": [
+          "/opt/ros/humble/setup.bash",
+          "~/robot_ws/install/setup.bash"
+        ]
+      }
     }
   ]
 }

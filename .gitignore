@@ -7,3 +7,11 @@ front-end/dist/
 front-end/*.tsbuildinfo
 front-end/vite.config.js
 front-end/vite.config.d.ts
+debug-front-end/node_modules/
+debug-front-end/dist/
+debug-front-end/*.tsbuildinfo
+debug-front-end/vite.config.js
+debug-front-end/vite.config.d.ts
+front-end/*.tsbuildinfo
+front-end/vite.config.js
+front-end/vite.config.d.ts

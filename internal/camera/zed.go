@@ -20,11 +20,11 @@ type CaptureResult struct {
 }
 
 type Status struct {
-	ZedUSB       string `json:"zed_usb"`
-	ZedTopics    string `json:"zed_topics"`
-	ZedLogTail   string `json:"zed_log_tail"`
-	PyzedProbe   string `json:"pyzed_probe"`
-	Summary      string `json:"summary"`
+	ZedUSB     string `json:"zed_usb"`
+	ZedTopics  string `json:"zed_topics"`
+	ZedLogTail string `json:"zed_log_tail"`
+	PyzedProbe string `json:"pyzed_probe"`
+	Summary    string `json:"summary"`
 }
 
 func CaptureWithPython(ctx context.Context, scriptPath string, outputPath string) (*CaptureResult, error) {

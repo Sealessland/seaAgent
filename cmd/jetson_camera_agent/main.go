@@ -1,6 +1,10 @@
 package main
 
-import "log"
+import (
+	"errors"
+	"log"
+	"net/http"
+)
 
 func main() {
 	cfg, err := loadConfig()
@@ -8,13 +12,28 @@ func main() {
 		log.Fatalf("load config failed: %v", err)
 	}
 
-	server, err := newServer(cfg)
+	app, err := newApplication(cfg)
 	if err != nil {
-		log.Fatalf("build server failed: %v", err)
+		log.Fatalf("build application failed: %v", err)
 	}
 
 	logStartup(cfg)
-	if err := server.ListenAndServe(); err != nil {
+	apiServer := app.newAPIServer()
+	debugServer := app.newDebugServer()
+
+	errCh := make(chan error, 2)
+	go func() {
+		if err := apiServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	go func() {
+		if err := debugServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	if err := <-errCh; err != nil {
 		log.Fatal(err)
 	}
 }
