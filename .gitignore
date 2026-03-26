@@ -1,5 +1,6 @@
 .env
 /jetson_camera_agent
+/ros2_topic_capture
 .cache/
 .idea/
 front-end/node_modules/

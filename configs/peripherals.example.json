@@ -47,7 +47,7 @@
         "transport": "ros2"
       },
       "capture": {
-        "script": "./scripts/capture_ros2_topic_image.py",
+        "binary": "./ros2_topic_capture",
         "topic": "/front_camera/image_raw/compressed",
         "message_type": "sensor_msgs/msg/CompressedImage",
         "encoding": "bgr8",

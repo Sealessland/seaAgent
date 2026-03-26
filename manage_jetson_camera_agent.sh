@@ -4,8 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 BIN_PATH="$ROOT_DIR/jetson_camera_agent"
+ROS2_HELPER_BIN_PATH="$ROOT_DIR/ros2_topic_capture"
 LOG_PATH="/tmp/jetson_camera_agent.log"
 GO_BIN="${GO_BIN:-$HOME/.local/toolchains/go1.23.12/bin/go}"
+ROS2_HELPER_TAGS="${ROS2_HELPER_TAGS:-ros2_rclgo}"
+ROS2_HELPER_SETUP="${ROS2_HELPER_SETUP:-}"
 
 if [[ -f "$ENV_FILE" ]]; then
   set -a
@@ -23,6 +26,18 @@ build() {
   GOPROXY="${GOPROXY:-https://goproxy.cn,direct}" \
   GOSUMDB="${GOSUMDB:-sum.golang.google.cn}" \
   "$GO_BIN" build -o "$BIN_PATH" ./cmd/jetson_camera_agent
+}
+
+build_ros2_helper() {
+  cd "$ROOT_DIR"
+  local setup_file
+  for setup_file in $ROS2_HELPER_SETUP; do
+    # shellcheck disable=SC1090
+    source "$setup_file"
+  done
+  GOPROXY="${GOPROXY:-https://goproxy.cn,direct}" \
+  GOSUMDB="${GOSUMDB:-sum.golang.google.cn}" \
+  "$GO_BIN" build -tags "$ROS2_HELPER_TAGS" -o "$ROS2_HELPER_BIN_PATH" ./cmd/ros2_topic_capture
 }
 
 stop() {
@@ -90,6 +105,9 @@ case "${1:-}" in
   build)
     build
     ;;
+  build-ros2-helper)
+    build_ros2_helper
+    ;;
   status)
     status
     ;;
@@ -116,6 +134,7 @@ Usage:
   ./manage_jetson_camera_agent.sh stop
   ./manage_jetson_camera_agent.sh restart
   ./manage_jetson_camera_agent.sh build
+  ./manage_jetson_camera_agent.sh build-ros2-helper
   ./manage_jetson_camera_agent.sh status
   ./manage_jetson_camera_agent.sh health
   ./manage_jetson_camera_agent.sh capture

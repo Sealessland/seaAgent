@@ -157,7 +157,9 @@ ZED 仍然走老路径：
 
 - `internal/peripherals/ros2_topic_device.go`
 - `internal/camera/ros2_topic.go`
-- `scripts/capture_ros2_topic_image.py`
+- `cmd/ros2_topic_capture`
+- `msgs/...`
+- `scripts/capture_ros2_topic_image.py`（兼容回退）
 
 并且 agent 可通过：
 
@@ -196,7 +198,7 @@ ROS2 设备。
 
 当前实现选的是：
 
-- 一个最小 `rclpy` subscriber
+- 一个最小 `rclgo` helper 二进制
 - 支持：
   - `sensor_msgs/msg/Image`
   - `sensor_msgs/msg/CompressedImage`
@@ -204,8 +206,9 @@ ROS2 设备。
 原因：
 
 - topic 是类型化消息，不是普通文本
-- 图像要经过 `cv_bridge` 或 `cv2.imdecode`
-- subscriber 比 CLI echo 更稳定，也更接近真实工程实践
+- 图像要经过类型化解码
+- `rclgo` 比继续依赖 Python subscriber 更贴近当前 Go 主链路
+- 仍保留 Python 脚本作为兼容回退路径
 
 ## 5. 已验证的事实
 
@@ -340,6 +343,8 @@ npm run build
 - `internal/peripherals/ros2_topic_device.go`
 - `internal/camera/zed.go`
 - `internal/camera/ros2_topic.go`
+- `cmd/ros2_topic_capture`
+- `msgs/...`
 - `scripts/capture_zed_frame.py`
 - `scripts/capture_ros2_topic_image.py`
 - `front-end/src/App.tsx`

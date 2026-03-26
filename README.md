@@ -33,6 +33,7 @@ Peripheral Config -> Peripheral Manager -> Observation Service -> Agent API -> F
 
 ```text
 ZED 2i -> scripts/capture_zed_frame.py -> internal/camera -> ObservationService
+ROS2 Topic -> ros2_topic_capture (rclgo) -> internal/camera -> ObservationService
 ```
 
 推理链路：
@@ -134,7 +135,16 @@ Frontend -> /api/agent/chat -> ObservationService -> internal/agent -> Model API
 ```bash
 cd ~/inference/eino-vlm-agent-demo
 go build ./cmd/jetson_camera_agent
+go build -tags ros2_rclgo -o ros2_topic_capture ./cmd/ros2_topic_capture   # 仅在启用 ros2_topic 外设时需要
 ./jetson_camera_agent
+```
+
+也可以直接用：
+
+```bash
+./manage_jetson_camera_agent.sh build
+./manage_jetson_camera_agent.sh build-ros2-helper   # 仅在启用 ros2_topic 外设时需要
+./manage_jetson_camera_agent.sh start
 ```
 
 用户前端：

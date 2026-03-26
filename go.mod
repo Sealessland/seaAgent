@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/cloudwego/eino v0.8.3
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.10
+	github.com/tiiuae/rclgo v0.0.0-20260225085354-508dd42245da
 )
 
 require (
@@ -35,7 +36,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

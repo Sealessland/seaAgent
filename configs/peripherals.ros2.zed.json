@@ -11,7 +11,7 @@
         "source": "zed_wrapper"
       },
       "capture": {
-        "script": "./scripts/capture_ros2_topic_image.py",
+        "binary": "./ros2_topic_capture",
         "topic": "/zed/zed_node/rgb/color/rect/image",
         "message_type": "sensor_msgs/msg/Image",
         "encoding": "bgr8",
