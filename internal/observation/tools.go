@@ -1,4 +1,4 @@
-package main
+package observation
 
 import (
 	"context"
@@ -10,12 +10,6 @@ import (
 
 	"eino-vlm-agent-demo/internal/peripherals"
 )
-
-type toolCallRecord struct {
-	Name   string            `json:"name"`
-	Input  map[string]string `json:"input,omitempty"`
-	Output map[string]string `json:"output,omitempty"`
-}
 
 type cameraReadTool struct {
 	workdir     string
@@ -29,10 +23,10 @@ func newCameraReadTool(workdir string, peripheralsManager *peripherals.Manager) 
 	}
 }
 
-func (t *cameraReadTool) Capture(ctx context.Context) (*peripherals.CaptureResult, toolCallRecord, error) {
+func (t *cameraReadTool) Capture(ctx context.Context) (*peripherals.CaptureResult, ToolCallRecord, error) {
 	filename := filepath.Join(t.workdir, "capture-"+time.Now().Format("20060102-150405.000000000")+".jpg")
 	result, err := t.peripherals.CapturePrimary(ctx, filename)
-	record := toolCallRecord{
+	record := ToolCallRecord{
 		Name: "camera_read",
 		Input: map[string]string{
 			"mode":        "capture_fresh",
@@ -49,9 +43,9 @@ func (t *cameraReadTool) Capture(ctx context.Context) (*peripherals.CaptureResul
 	return result, record, err
 }
 
-func (t *cameraReadTool) LatestImagePath() (string, toolCallRecord, error) {
+func (t *cameraReadTool) LatestImagePath() (string, ToolCallRecord, error) {
 	path, err := latestCapturePath(t.workdir)
-	record := toolCallRecord{
+	record := ToolCallRecord{
 		Name: "camera_read",
 		Input: map[string]string{
 			"mode": "use_latest_image",

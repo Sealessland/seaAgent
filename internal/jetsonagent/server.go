@@ -1,4 +1,4 @@
-package main
+package jetsonagent
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"eino-vlm-agent-demo/internal/agent"
+	"eino-vlm-agent-demo/internal/observation"
 	"eino-vlm-agent-demo/internal/peripherals"
 )
 
@@ -21,7 +22,7 @@ var staticFS embed.FS
 
 type application struct {
 	cfg         appConfig
-	observation *ObservationService
+	observation *observation.Service
 	healthCheck *http.Client
 }
 
@@ -50,11 +51,11 @@ func newApplication(cfg appConfig) (*application, error) {
 		cfg:         cfg,
 		healthCheck: &http.Client{Timeout: 15 * time.Second},
 	}
-	observation, err := NewObservationService(cfg.Workdir, cfg.DefaultPrompt, cfg.EnableImageInput, peripheralsManager, visionAgent)
+	observationService, err := observation.NewService(cfg.Workdir, cfg.DefaultPrompt, cfg.EnableImageInput, peripheralsManager, visionAgent)
 	if err != nil {
 		return nil, err
 	}
-	app.observation = observation
+	app.observation = observationService
 
 	return app, nil
 }

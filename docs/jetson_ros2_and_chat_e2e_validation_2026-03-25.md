@@ -47,12 +47,12 @@
 
 初学者建议按下面顺序看代码：
 
-1. `cmd/jetson_camera_agent/server.go`
-2. `cmd/jetson_camera_agent/handlers.go`
-3. `cmd/jetson_camera_agent/service.go`
-4. `cmd/jetson_camera_agent/chat_tools.go`
+1. `internal/jetsonagent/server.go`
+2. `internal/jetsonagent/handlers.go`
+3. `internal/observation/service.go`
+4. `internal/observation/chat_tools.go`
 5. `internal/agent/vision_agent.go`
-6. `cmd/jetson_camera_agent/session_store.go`
+6. `internal/observation/session_store.go`
 7. `internal/peripherals/ros2_topic_device.go`
 8. `internal/camera/ros2_topic.go`
 9. `scripts/capture_ros2_topic_image.py`
@@ -75,17 +75,17 @@
 以“请直接观察当前画面，告诉我前方有什么”为例，真实调用链如下：
 
 1. 浏览器请求 `/api/agent/chat` 或 `/api/agent/chat/stream`
-2. 路由定义在 `cmd/jetson_camera_agent/server.go`
-3. 请求处理在 `cmd/jetson_camera_agent/handlers.go`
+2. 路由定义在 `internal/jetsonagent/server.go`
+3. 请求处理在 `internal/jetsonagent/handlers.go`
 4. 处理函数继续调用 `ObservationService.AgentChat(...)`
-5. `cmd/jetson_camera_agent/service.go` 会先做动作启发：
+5. `internal/observation/service.go` 会先做动作启发：
    - 是否需要 fresh capture
    - 是否要复用 latest image
    - 是否要做 image comparison
    - 是否附带 peripherals snapshot
 6. 然后它调用 `VisionAgent.Chat(...)`
 7. `internal/agent/vision_agent.go` 内部用 Eino ADK 的 `ChatModelAgent`
-8. agent 可调用在 `cmd/jetson_camera_agent/chat_tools.go` 注册的工具
+8. agent 可调用在 `internal/observation/chat_tools.go` 注册的工具
 9. 若调用 `camera_read` 或 `ros2_topic_read(mode=capture)`，会进入 peripherals manager
 10. peripherals manager 再把请求转发到 `ros2_topic` device
 11. `internal/peripherals/ros2_topic_device.go` 组织 capture 参数
@@ -93,7 +93,7 @@
 13. `scripts/capture_ros2_topic_image.py` 启动 `rclpy` 节点，订阅一次 topic，拿到一帧，保存图片
 14. 图片路径回到 Go 服务
 15. `internal/agent/vision_agent.go` 再把图片作为多模态输入发给模型，让它真正“读图后回答”
-16. `cmd/jetson_camera_agent/session_store.go` 会记住这张图，以便下一轮比较“上一张 vs 当前张”
+16. `internal/observation/session_store.go` 会记住这张图，以便下一轮比较“上一张 vs 当前张”
 
 ### 0.4 prompt 和服务端为什么都要做
 
@@ -104,7 +104,7 @@
 当前项目采用的是两层配合：
 
 - `prompts/system.txt` 负责约束模型行为
-- `cmd/jetson_camera_agent/service.go` 负责工程兜底
+- `internal/observation/service.go` 负责工程兜底
 
 例如系统 prompt 明确要求：
 
@@ -423,11 +423,11 @@ curl -sS -N -X POST http://127.0.0.1:18084/api/agent/chat/stream \
 - 真正 subscriber：
   `scripts/capture_ros2_topic_image.py`
 - tool 定义：
-  `cmd/jetson_camera_agent/chat_tools.go`
+  `internal/observation/chat_tools.go`
 - agent 调用工具与读图：
   `internal/agent/vision_agent.go`
 - 服务编排与兜底：
-  `cmd/jetson_camera_agent/service.go`
+  `internal/observation/service.go`
 
 ### 4.6 对 Eino agent 的推荐做法
 
@@ -479,7 +479,7 @@ curl -sS -N -X POST http://127.0.0.1:18084/api/agent/chat/stream \
 如果以后想把某个设备能力封装成更好懂的 tool，建议按当前项目的模式来：
 
 1. 先定义清晰的输入输出 struct。
-2. 在 `cmd/jetson_camera_agent/chat_tools.go` 里用 `utils.InferTool(...)` 注册。
+2. 在 `internal/observation/chat_tools.go` 里用 `utils.InferTool(...)` 注册。
 3. tool 内部只做高层动作，不暴露 ROS2 底层细节。
 4. 真正的底层读取或控制，继续下沉到 peripherals / camera / driver 层。
 5. 在 `prompts/system.txt` 中补充什么时候应该使用这个 tool。
@@ -526,7 +526,7 @@ curl -sS -N -X POST http://127.0.0.1:18084/api/agent/chat/stream \
 - ROS2 外设 driver：
   [ros2_topic_device.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/peripherals/ros2_topic_device.go)
 - Agent tool 定义：
-  [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/chat_tools.go)
+  [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/observation/chat_tools.go)
 - 配置示例：
   [peripherals.ros2.zed.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/peripherals.ros2.zed.json)
 

@@ -1,4 +1,4 @@
-package main
+package observation
 
 import (
 	"context"
@@ -17,81 +17,24 @@ import (
 	einotool "github.com/cloudwego/eino/components/tool"
 )
 
-type VisionAnalyzer interface {
-	AnalyzeImage(ctx context.Context, imagePath string, prompt string) (string, error)
-	Chat(ctx context.Context, req agent.ChatRequest) (agent.ChatResponse, error)
-}
-
-type agentCapability struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-type agentCapabilitiesResponse struct {
-	Name         string            `json:"name"`
-	Description  string            `json:"description"`
-	Capabilities []agentCapability `json:"capabilities"`
-}
-
-type agentChatRequest struct {
-	SessionID       string                   `json:"session_id,omitempty"`
-	Message         string                   `json:"message"`
-	History         []agent.ConversationTurn `json:"history,omitempty"`
-	CaptureFresh    bool                     `json:"capture_fresh,omitempty"`
-	UseLatestImage  bool                     `json:"use_latest_image,omitempty"`
-	IncludeSnapshot bool                     `json:"include_snapshot,omitempty"`
-}
-
-type agentAction struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
-}
-
-type agentSource struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Snippet string `json:"snippet"`
-	Score   int    `json:"score"`
-}
-
-type agentTrace struct {
-	Intent       string           `json:"intent"`
-	Actions      []agentAction    `json:"actions"`
-	ToolCalls    []toolCallRecord `json:"tool_calls,omitempty"`
-	RetrievedIDs []string         `json:"retrieved_ids"`
-}
-
-type agentChatResponse struct {
-	SessionID   string                     `json:"session_id,omitempty"`
-	Reply       string                     `json:"reply,omitempty"`
-	Capture     *peripherals.CaptureResult `json:"capture,omitempty"`
-	Peripherals *peripherals.FleetSnapshot `json:"peripherals,omitempty"`
-	Sources     []agentSource              `json:"sources,omitempty"`
-	Trace       *agentTrace                `json:"trace,omitempty"`
-	Error       string                     `json:"error,omitempty"`
-}
-
 type knowledgeDocument struct {
 	ID      string
 	Title   string
 	Content string
 }
 
-type ObservationService struct {
+type Service struct {
 	workdir          string
 	defaultPrompt    string
 	enableImageInput bool
 	peripherals      *peripherals.Manager
 	cameraTool       *cameraReadTool
 	dialogueTools    []einotool.InvokableTool
-	analyzer         VisionAnalyzer
+	analyzer         Analyzer
 	sessions         *sessionStore
 }
 
-func NewObservationService(workdir string, defaultPrompt string, enableImageInput bool, peripheralsManager *peripherals.Manager, analyzer VisionAnalyzer) (*ObservationService, error) {
+func NewService(workdir string, defaultPrompt string, enableImageInput bool, peripheralsManager *peripherals.Manager, analyzer Analyzer) (*Service, error) {
 	sessions, err := newSessionStore(workdir)
 	if err != nil {
 		return nil, err
@@ -100,7 +43,7 @@ func NewObservationService(workdir string, defaultPrompt string, enableImageInpu
 	if err != nil {
 		return nil, err
 	}
-	return &ObservationService{
+	return &Service{
 		workdir:          workdir,
 		defaultPrompt:    defaultPrompt,
 		enableImageInput: enableImageInput,
@@ -112,37 +55,37 @@ func NewObservationService(workdir string, defaultPrompt string, enableImageInpu
 	}, nil
 }
 
-func (s *ObservationService) InspectPeripherals(ctx context.Context) peripherals.FleetSnapshot {
+func (s *Service) InspectPeripherals(ctx context.Context) peripherals.FleetSnapshot {
 	return s.peripherals.InspectAll(ctx)
 }
 
-func (s *ObservationService) InspectPrimary(ctx context.Context) (peripherals.DeviceSnapshot, error) {
+func (s *Service) InspectPrimary(ctx context.Context) (peripherals.DeviceSnapshot, error) {
 	return s.peripherals.InspectPrimary(ctx)
 }
 
-func (s *ObservationService) CapturePrimary(ctx context.Context) (*peripherals.CaptureResult, error) {
+func (s *Service) CapturePrimary(ctx context.Context) (*peripherals.CaptureResult, error) {
 	result, _, err := s.cameraTool.Capture(ctx)
 	return result, err
 }
 
-func (s *ObservationService) AnalyzePrimary(ctx context.Context, prompt string) (analyzeResponse, error) {
+func (s *Service) AnalyzePrimary(ctx context.Context, prompt string) (AnalyzeResponse, error) {
 	if prompt == "" {
 		prompt = s.defaultPrompt
 	}
 
 	capture, err := s.CapturePrimary(ctx)
 	if err != nil {
-		return analyzeResponse{}, err
+		return AnalyzeResponse{}, err
 	}
 	if capture.Error != "" || !capture.OK {
-		return analyzeResponse{
+		return AnalyzeResponse{
 			Capture:     capture,
 			Peripherals: s.snapshotPtr(ctx),
 			Error:       "camera capture failed before agent inference",
 		}, nil
 	}
 	if !s.enableImageInput {
-		return analyzeResponse{
+		return AnalyzeResponse{
 			Capture:     capture,
 			Peripherals: s.snapshotPtr(ctx),
 			Error:       "configured model does not support image input; set JETSON_ENABLE_IMAGE_INPUT=true only for a vision-capable model",
@@ -154,25 +97,25 @@ func (s *ObservationService) AnalyzePrimary(ctx context.Context, prompt string) 
 
 	result, err := s.analyzer.AnalyzeImage(analyzeCtx, capture.Output, prompt)
 	if err != nil {
-		return analyzeResponse{
+		return AnalyzeResponse{
 			Capture:     capture,
 			Peripherals: s.snapshotPtr(ctx),
 			Error:       err.Error(),
 		}, nil
 	}
 
-	return analyzeResponse{
+	return AnalyzeResponse{
 		Capture:     capture,
 		Peripherals: s.snapshotPtr(ctx),
 		Result:      result,
 	}, nil
 }
 
-func (s *ObservationService) AgentCapabilities() agentCapabilitiesResponse {
-	return agentCapabilitiesResponse{
+func (s *Service) Capabilities() CapabilitiesResponse {
+	return CapabilitiesResponse{
 		Name:        "Jetson Peripheral Agent",
 		Description: "Multimodal chat over live camera frames and embedded peripheral snapshots.",
-		Capabilities: []agentCapability{
+		Capabilities: []Capability{
 			{ID: "chat", Name: "Dialogue", Description: "Maintains short-turn conversation with user prompts and assistant responses."},
 			{ID: "vision", Name: "Vision Context", Description: "Can analyze a fresh capture or the most recent local image when available."},
 			{ID: "peripherals", Name: "Peripheral Snapshot", Description: "Can include the current peripheral fleet state in the reasoning context."},
@@ -183,10 +126,10 @@ func (s *ObservationService) AgentCapabilities() agentCapabilitiesResponse {
 	}
 }
 
-func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest) (agentChatResponse, error) {
+func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	session, err := s.loadSession(req)
 	if err != nil {
-		return agentChatResponse{}, err
+		return ChatResponse{}, err
 	}
 
 	intent := inferIntent(req.Message)
@@ -198,7 +141,7 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 		req.CaptureFresh = false
 		req.UseLatestImage = false
 	}
-	trace := &agentTrace{
+	trace := &Trace{
 		Intent:  intent,
 		Actions: actionTrace(req),
 	}
@@ -214,14 +157,14 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 
 	switch {
 	case req.CaptureFresh:
-		var call toolCallRecord
+		var call ToolCallRecord
 		capture, call, err = s.cameraTool.Capture(ctx)
 		trace.ToolCalls = append(trace.ToolCalls, call)
 		if err != nil {
-			return agentChatResponse{}, err
+			return ChatResponse{}, err
 		}
 		if capture.Error != "" || !capture.OK {
-			return agentChatResponse{
+			return ChatResponse{
 				SessionID:   session.ID,
 				Capture:     capture,
 				Peripherals: s.snapshotPtr(ctx),
@@ -231,7 +174,7 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 		}
 		imagePath = capture.Output
 	case req.UseLatestImage:
-		var call toolCallRecord
+		var call ToolCallRecord
 		imagePath, call, err = s.cameraTool.LatestImagePath()
 		trace.ToolCalls = append(trace.ToolCalls, call)
 		if err != nil {
@@ -243,11 +186,11 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 	}
 	if compareRequest && previousSessionImagePath != "" && previousSessionImagePath != imagePath {
 		if imagePath == "" {
-			var call toolCallRecord
+			var call ToolCallRecord
 			capture, call, err = s.cameraTool.Capture(ctx)
 			trace.ToolCalls = append(trace.ToolCalls, call)
 			if err != nil {
-				return agentChatResponse{}, err
+				return ChatResponse{}, err
 			}
 			if capture != nil && capture.OK {
 				imagePath = capture.Output
@@ -307,7 +250,7 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 		MaxToolCallLoops: 4,
 	})
 	if err != nil {
-		return agentChatResponse{
+		return ChatResponse{
 			SessionID:   session.ID,
 			Capture:     capture,
 			Peripherals: snapshot,
@@ -337,10 +280,10 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 	)
 	session.Summary, session.Messages = summarizeHistory(session.Summary, session.Messages)
 	if err := s.sessions.Save(session); err != nil {
-		return agentChatResponse{}, err
+		return ChatResponse{}, err
 	}
 
-	return agentChatResponse{
+	return ChatResponse{
 		SessionID:   session.ID,
 		Reply:       reply,
 		Capture:     capture,
@@ -350,7 +293,7 @@ func (s *ObservationService) AgentChat(ctx context.Context, req agentChatRequest
 	}, nil
 }
 
-func (s *ObservationService) LatestCapturePath() (string, error) {
+func (s *Service) LatestCapturePath() (string, error) {
 	matches, err := filepath.Glob(filepath.Join(s.workdir, "capture-*.jpg"))
 	if err != nil {
 		return "", err
@@ -366,12 +309,12 @@ func (s *ObservationService) LatestCapturePath() (string, error) {
 	return matches[0], nil
 }
 
-func (s *ObservationService) snapshotPtr(ctx context.Context) *peripherals.FleetSnapshot {
+func (s *Service) snapshotPtr(ctx context.Context) *peripherals.FleetSnapshot {
 	snapshot := s.InspectPeripherals(ctx)
 	return &snapshot
 }
 
-func (s *ObservationService) loadSession(req agentChatRequest) (*conversationSession, error) {
+func (s *Service) loadSession(req ChatRequest) (*conversationSession, error) {
 	if strings.TrimSpace(req.SessionID) == "" {
 		session := s.sessions.New()
 		if len(req.History) > 0 {
@@ -395,7 +338,7 @@ func (s *ObservationService) loadSession(req agentChatRequest) (*conversationSes
 	return session, nil
 }
 
-func (s *ObservationService) chatHistory(session *conversationSession) []agent.ConversationTurn {
+func (s *Service) chatHistory(session *conversationSession) []agent.ConversationTurn {
 	history := make([]agent.ConversationTurn, 0, len(session.Messages)+1)
 	if strings.TrimSpace(session.Summary) != "" {
 		history = append(history, agent.ConversationTurn{
@@ -407,7 +350,7 @@ func (s *ObservationService) chatHistory(session *conversationSession) []agent.C
 	return history
 }
 
-func (s *ObservationService) applyActionHeuristics(req agentChatRequest) agentChatRequest {
+func (s *Service) applyActionHeuristics(req ChatRequest) ChatRequest {
 	lower := strings.ToLower(req.Message)
 	if containsAny(lower, "camera_read", "调用camera_read", "call camera_read", "ros2_topic_read", "调用ros2_topic_read", "call ros2_topic_read") {
 		if containsAny(lower, "sensor", "peripheral", "radar", "status", "depth", "外设", "雷达", "状态", "相机") {
@@ -442,28 +385,28 @@ func inferIntent(message string) string {
 	}
 }
 
-func actionTrace(req agentChatRequest) []agentAction {
-	return []agentAction{
+func actionTrace(req ChatRequest) []Action {
+	return []Action{
 		{ID: "capture_fresh", Label: "Fresh Capture", Description: "Capture a new frame before answering.", Enabled: req.CaptureFresh},
 		{ID: "use_latest_image", Label: "Latest Image", Description: "Reuse the most recent captured image.", Enabled: req.UseLatestImage},
 		{ID: "include_snapshot", Label: "Peripheral Snapshot", Description: "Attach the current peripheral fleet snapshot.", Enabled: req.IncludeSnapshot},
 	}
 }
 
-func (s *ObservationService) retrieveSources(prompt string, history []agent.ConversationTurn, snapshot *peripherals.FleetSnapshot) []agentSource {
+func (s *Service) retrieveSources(prompt string, history []agent.ConversationTurn, snapshot *peripherals.FleetSnapshot) []Source {
 	queryTerms := tokenize(prompt)
 	for _, turn := range history {
 		queryTerms = append(queryTerms, tokenize(turn.Content)...)
 	}
 
 	docs := s.knowledgeDocs(snapshot)
-	sources := make([]agentSource, 0, len(docs))
+	sources := make([]Source, 0, len(docs))
 	for _, doc := range docs {
 		score := overlapScore(queryTerms, tokenize(doc.Content+" "+doc.Title))
 		if score == 0 {
 			continue
 		}
-		sources = append(sources, agentSource{
+		sources = append(sources, Source{
 			ID:      doc.ID,
 			Title:   doc.Title,
 			Snippet: trimSnippet(doc.Content, 180),
@@ -483,7 +426,7 @@ func (s *ObservationService) retrieveSources(prompt string, history []agent.Conv
 	return sources
 }
 
-func (s *ObservationService) knowledgeDocs(snapshot *peripherals.FleetSnapshot) []knowledgeDocument {
+func (s *Service) knowledgeDocs(snapshot *peripherals.FleetSnapshot) []knowledgeDocument {
 	docs := []knowledgeDocument{
 		{ID: "cap-chat", Title: "Dialogue", Content: "The agent supports multi-turn dialogue using prior user and assistant turns."},
 		{ID: "cap-vision", Title: "Vision Context", Content: "The agent can answer with the latest image or a freshly captured frame from the primary device."},
@@ -515,7 +458,7 @@ func (s *ObservationService) knowledgeDocs(snapshot *peripherals.FleetSnapshot) 
 	return docs
 }
 
-func sourceIDs(sources []agentSource) []string {
+func sourceIDs(sources []Source) []string {
 	ids := make([]string, 0, len(sources))
 	for _, source := range sources {
 		ids = append(ids, source.ID)
@@ -613,7 +556,7 @@ func looksLikeToolDeferral(reply string) bool {
 	)
 }
 
-func (s *ObservationService) autoRecoverVisualReply(
+func (s *Service) autoRecoverVisualReply(
 	ctx context.Context,
 	session *conversationSession,
 	userPrompt string,
@@ -622,12 +565,12 @@ func (s *ObservationService) autoRecoverVisualReply(
 	capture *peripherals.CaptureResult,
 	imagePath string,
 	snapshot *peripherals.FleetSnapshot,
-) (string, *peripherals.CaptureResult, []toolCallRecord, bool) {
+) (string, *peripherals.CaptureResult, []ToolCallRecord, bool) {
 	if !requestsFreshVisualObservation(strings.ToLower(userPrompt)) || !looksLikeToolDeferral(reply) {
 		return reply, capture, nil, false
 	}
 
-	recoveryTrace := make([]toolCallRecord, 0, 1)
+	recoveryTrace := make([]ToolCallRecord, 0, 1)
 	recoveryImagePath := strings.TrimSpace(imagePath)
 	recoveryCapture := capture
 
@@ -636,7 +579,7 @@ func (s *ObservationService) autoRecoverVisualReply(
 	}
 
 	if recoveryImagePath == "" {
-		var call toolCallRecord
+		var call ToolCallRecord
 		path, latestCall, err := s.cameraTool.LatestImagePath()
 		if err == nil && strings.TrimSpace(path) != "" {
 			recoveryImagePath = path
@@ -689,7 +632,7 @@ func buildDirectVisualAnswerPrompt(chatPrompt string, snapshot *peripherals.Flee
 	return builder.String()
 }
 
-func imagePathsFromToolRecords(records []toolCallRecord) []string {
+func imagePathsFromToolRecords(records []ToolCallRecord) []string {
 	paths := make([]string, 0, len(records))
 	for _, record := range records {
 		if record.Name != "camera_read" && record.Name != "ros2_topic_read" {
@@ -743,8 +686,8 @@ func forcedToolNames(prompt string) []string {
 	}
 }
 
-func toolTraceRecord(trace agent.ToolCallTrace) toolCallRecord {
-	record := toolCallRecord{
+func toolTraceRecord(trace agent.ToolCallTrace) ToolCallRecord {
+	record := ToolCallRecord{
 		Name: trace.Name,
 	}
 	if strings.TrimSpace(trace.Arguments) != "" {

@@ -54,13 +54,13 @@ ZED 是通过统一外设配置注册进系统的。
 
 对应代码：
 
-- [handlers.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/handlers.go)
-- [tools.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/tools.go)
-- [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/chat_tools.go)
+- [handlers.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/jetsonagent/handlers.go)
+- [tools.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/observation/tools.go)
+- [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/observation/chat_tools.go)
 
 不管从哪条入口进，最终都会走到：
 
-- [service.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/service.go)
+- [service.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/observation/service.go)
 
 其中：
 
@@ -398,4 +398,3 @@ curl http://127.0.0.1:18080/api/camera/capture
 2. `lsusb`
 3. `/tmp/zed_launch.log`
 4. `camera.open(...)` 是否成功
-

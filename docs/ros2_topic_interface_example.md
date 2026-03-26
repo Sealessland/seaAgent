@@ -29,6 +29,8 @@
 `configs/peripherals.example.json` 里已经补了一个示例设备：
 
 - [peripherals.example.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/peripherals.example.json)
+- [configs/README.md](/home/sealessland/inference/eino-vlm-agent-demo/configs/README.md)
+- [ros2_topic_device.example.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/snippets/ros2_topic_device.example.json)
 
 示例字段：
 
@@ -172,7 +174,7 @@ go build -tags ros2_rclgo -o ros2_topic_capture ./cmd/ros2_topic_capture
 
 定义位置：
 
-- [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/cmd/jetson_camera_agent/chat_tools.go)
+- [chat_tools.go](/home/sealessland/inference/eino-vlm-agent-demo/internal/observation/chat_tools.go)
 
 支持三种模式：
 

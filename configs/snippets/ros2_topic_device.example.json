@@ -1,0 +1,20 @@
+{
+  "name": "front-camera-ros2",
+  "kind": "rgb_camera",
+  "driver": "ros2_topic",
+  "metadata": {
+    "mount": "front",
+    "transport": "ros2"
+  },
+  "capture": {
+    "binary": "./ros2_topic_capture",
+    "topic": "/front_camera/image_raw/compressed",
+    "message_type": "sensor_msgs/msg/CompressedImage",
+    "encoding": "bgr8",
+    "timeout_seconds": 5,
+    "ros_setup": [
+      "/opt/ros/humble/setup.bash",
+      "~/robot_ws/install/setup.bash"
+    ]
+  }
+}

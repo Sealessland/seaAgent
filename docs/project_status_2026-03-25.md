@@ -30,17 +30,17 @@
 
 如果你第一次看代码，建议按这一层层往下看：
 
-1. `cmd/jetson_camera_agent/server.go`
+1. `internal/jetsonagent/server.go`
    负责 HTTP 路由注册与应用启动
-2. `cmd/jetson_camera_agent/handlers.go`
+2. `internal/jetsonagent/handlers.go`
    负责把 HTTP 请求转成 service 调用
-3. `cmd/jetson_camera_agent/service.go`
+3. `internal/observation/service.go`
    负责核心业务编排，是当前系统最关键的文件
-4. `cmd/jetson_camera_agent/chat_tools.go`
+4. `internal/observation/chat_tools.go`
    负责把能力封装成 agent 可调用的 tool
 5. `internal/agent/vision_agent.go`
    负责 Eino agent、模型、多图输入、tool calling 与读图后综合回答
-6. `cmd/jetson_camera_agent/session_store.go`
+6. `internal/observation/session_store.go`
    负责 session 历史与最近几张图片记忆
 7. `internal/peripherals/*.go`
    负责外设抽象与 driver
@@ -122,7 +122,7 @@
 
 工具定义在：
 
-- `cmd/jetson_camera_agent/chat_tools.go`
+- `internal/observation/chat_tools.go`
 
 目前最重要的几个 tool：
 
@@ -368,8 +368,8 @@ Jetson 当前目录不是干净的 git 工作树。
 
 1. 先读本文件，了解当前状态。
 2. 打开 `docs/jetson_ros2_and_chat_e2e_validation_2026-03-25.md` 看验收细节。
-3. 看 `cmd/jetson_camera_agent/service.go` 理解业务编排。
-4. 看 `cmd/jetson_camera_agent/chat_tools.go` 和 `internal/agent/vision_agent.go` 理解 tool call 与读图逻辑。
+3. 看 `internal/observation/service.go` 理解业务编排。
+4. 看 `internal/observation/chat_tools.go` 和 `internal/agent/vision_agent.go` 理解 tool call 与读图逻辑。
 5. 看 `configs/peripherals.ros2.zed.json` 理解当前 ROS2 配置。
 6. 若要新增 ROS2 图像设备，优先走“新增配置 + 复用 `ros2_topic_read`”。
 7. 若要切换默认主链路，再单独处理 `18080` 默认实例。

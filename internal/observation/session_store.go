@@ -1,4 +1,4 @@
-package main
+package observation
 
 import (
 	"encoding/json"

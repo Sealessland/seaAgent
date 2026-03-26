@@ -1,4 +1,4 @@
-package main
+package jetsonagent
 
 import (
 	"encoding/json"
@@ -9,15 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"eino-vlm-agent-demo/internal/observation"
 	"eino-vlm-agent-demo/internal/peripherals"
 )
-
-type analyzeResponse struct {
-	Result      string                     `json:"result,omitempty"`
-	Capture     *peripherals.CaptureResult `json:"capture,omitempty"`
-	Peripherals *peripherals.FleetSnapshot `json:"peripherals,omitempty"`
-	Error       string                     `json:"error,omitempty"`
-}
 
 type uiConfigResponse struct {
 	Title         string `json:"title"`
@@ -112,7 +106,7 @@ func (app *application) handlePeripheralStream(w http.ResponseWriter, r *http.Re
 }
 
 func (app *application) handleAgentCapabilities(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, app.observation.AgentCapabilities())
+	writeJSON(w, http.StatusOK, app.observation.Capabilities())
 }
 
 func (app *application) handleAgentChat(w http.ResponseWriter, r *http.Request) {
@@ -121,11 +115,11 @@ func (app *application) handleAgentChat(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req agentChatRequest
+	var req observation.ChatRequest
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeJSON(w, http.StatusBadRequest, agentChatResponse{Error: "invalid request body"})
+			writeJSON(w, http.StatusBadRequest, observation.ChatResponse{Error: "invalid request body"})
 			return
 		}
 	}
@@ -136,9 +130,9 @@ func (app *application) handleAgentChat(w http.ResponseWriter, r *http.Request) 
 		req.IncludeSnapshot = true
 	}
 
-	result, err := app.observation.AgentChat(r.Context(), req)
+	result, err := app.observation.Chat(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, agentChatResponse{Error: err.Error()})
+		writeJSON(w, http.StatusBadGateway, observation.ChatResponse{Error: err.Error()})
 		return
 	}
 	if result.Error != "" {
@@ -160,7 +154,7 @@ func (app *application) handleAgentChatStream(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var req agentChatRequest
+	var req observation.ChatRequest
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &req); err != nil {
@@ -195,7 +189,7 @@ func (app *application) handleAgentChatStream(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	result, err := app.observation.AgentChat(r.Context(), req)
+	result, err := app.observation.Chat(r.Context(), req)
 	if err != nil {
 		_ = writeStreamEvent("error", map[string]string{"error": err.Error()})
 		return
@@ -256,7 +250,7 @@ func (app *application) handleCaptureAndAnalyze(w http.ResponseWriter, r *http.R
 	prompt := app.resolvePrompt(r)
 	result, err := app.observation.AnalyzePrimary(r.Context(), prompt)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, analyzeResponse{Error: err.Error()})
+		writeJSON(w, http.StatusBadGateway, observation.AnalyzeResponse{Error: err.Error()})
 		return
 	}
 	if result.Error != "" {

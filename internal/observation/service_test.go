@@ -1,11 +1,11 @@
-package main
+package observation
 
 import "testing"
 
 func TestApplyActionHeuristicsPrefersFreshCaptureForObservation(t *testing.T) {
-	service := &ObservationService{}
+	service := &Service{}
 
-	req := service.applyActionHeuristics(agentChatRequest{
+	req := service.applyActionHeuristics(ChatRequest{
 		Message: "请观察一下当前摄像头画面里有什么",
 	})
 
@@ -18,9 +18,9 @@ func TestApplyActionHeuristicsPrefersFreshCaptureForObservation(t *testing.T) {
 }
 
 func TestApplyActionHeuristicsUsesLatestOnlyWhenExplicitlyRequested(t *testing.T) {
-	service := &ObservationService{}
+	service := &Service{}
 
-	req := service.applyActionHeuristics(agentChatRequest{
+	req := service.applyActionHeuristics(ChatRequest{
 		Message: "请复用最新一帧图片回答",
 	})
 

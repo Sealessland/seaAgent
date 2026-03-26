@@ -24,7 +24,16 @@
 代码职责：
 
 - `cmd/jetson_camera_agent`
-  - 服务入口、HTTP、配置、service、tool 注册
+  - 进程入口
+- `internal/jetsonagent`
+  - 配置加载
+  - 启动装配
+  - HTTP 路由 / handler
+  - fallback 静态页
+- `internal/observation`
+  - 对话编排
+  - 会话存储
+  - tool 注册与 adapter
 - `internal/agent`
   - Eino 对话模型封装
   - tool-calling 对话执行
@@ -44,21 +53,18 @@
   - 当前实际外设配置
 - `configs/peripherals.example.json`
   - 扩展示例配置
+- `configs/snippets/ros2_topic_device.example.json`
+  - 新 ROS2 topic 设备注册片段
 
 ## 3. 已经完成了什么
 
 ### 3.1 main / 后端分层
 
-单文件 `main` 已拆分：
+现在后端分层是：
 
 - `main.go`
-- `config.go`
-- `server.go`
-- `handlers.go`
-- `service.go`
-- `session_store.go`
-- `tools.go`
-- `chat_tools.go`
+- `internal/jetsonagent`
+- `internal/observation`
 
 `.env` 和 system prompt 已剥离：
 
@@ -330,11 +336,13 @@ npm run build
 
 下一个会话大概率会反复用到这些文件：
 
-- `cmd/jetson_camera_agent/service.go`
-- `cmd/jetson_camera_agent/handlers.go`
-- `cmd/jetson_camera_agent/chat_tools.go`
-- `cmd/jetson_camera_agent/tools.go`
-- `cmd/jetson_camera_agent/session_store.go`
+- `internal/jetsonagent/server.go`
+- `internal/jetsonagent/handlers.go`
+- `internal/jetsonagent/config.go`
+- `internal/observation/service.go`
+- `internal/observation/chat_tools.go`
+- `internal/observation/tools.go`
+- `internal/observation/session_store.go`
 - `internal/agent/vision_agent.go`
 - `internal/agent/vision_agent_test.go`
 - `internal/peripherals/config.go`
@@ -351,6 +359,7 @@ npm run build
 - `front-end/src/api.ts`
 - `configs/peripherals.json`
 - `configs/peripherals.example.json`
+- `configs/snippets/ros2_topic_device.example.json`
 - `docs/zed_capture_flow_example.md`
 - `docs/ros2_topic_interface_example.md`
 
@@ -361,10 +370,11 @@ npm run build
 1. 读这份文档
 2. 再读：
    - `README.md`
+   - `configs/README.md`
    - `docs/zed_capture_flow_example.md`
    - `docs/ros2_topic_interface_example.md`
 3. 再看：
-   - `cmd/jetson_camera_agent/service.go`
+   - `internal/observation/service.go`
    - `internal/agent/vision_agent.go`
    - `internal/peripherals/manager.go`
 4. 再决定本轮需求属于：
@@ -434,7 +444,7 @@ npm run build
 
 如果后面再动配置加载，优先检查：
 
-- `cmd/jetson_camera_agent/config.go`
+- `internal/jetsonagent/config.go`
 - `.env`
 - `.env.example`
 - `prompts/system.txt`

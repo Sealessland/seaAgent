@@ -45,11 +45,19 @@ Frontend -> /api/agent/chat -> ObservationService -> internal/agent -> Model API
 ## 目录
 
 - `cmd/jetson_camera_agent`
-  - 服务入口、配置、路由、HTTP handler、fallback 页面
+  - 进程入口
+- `internal/jetsonagent`
+  - 服务启动装配
+  - HTTP 路由与 handler
+  - fallback 静态页
+- `internal/observation`
+  - 对话编排
+  - 会话存储
+  - tool adapter
+  - 观察/读图业务服务
 - `internal/agent`
   - Eino 模型封装
-  - 多轮对话
-  - 基础 RAG / action planning
+  - tool-calling runner
 - `internal/peripherals`
   - 外设抽象
   - 外设管理器
@@ -57,7 +65,11 @@ Frontend -> /api/agent/chat -> ObservationService -> internal/agent -> Model API
 - `internal/camera`
   - 具体摄像头抓帧实现
 - `configs/peripherals.json`
-  - 外设注册入口
+  - 当前运行时外设注册入口
+- `configs/README.md`
+  - ROS2 / 其他外设注册说明
+- `configs/snippets`
+  - 可直接复制的设备配置片段
 - `front-end`
   - 用户态前端
   - Preact + Vite
@@ -84,6 +96,13 @@ Frontend -> /api/agent/chat -> ObservationService -> internal/agent -> Model API
 
 外设统一配置在 `configs/peripherals.json`。
 
+如果你是嵌入式开发同学，只想“把一个 ROS2 topic 注册进来给 agent 用”，先看：
+
+1. [README.md](/home/sealessland/inference/eino-vlm-agent-demo/README.md)
+2. [configs/README.md](/home/sealessland/inference/eino-vlm-agent-demo/configs/README.md)
+3. [ros2_topic_device.example.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/snippets/ros2_topic_device.example.json)
+4. [ros2_topic_interface_example.md](/home/sealessland/inference/eino-vlm-agent-demo/docs/ros2_topic_interface_example.md)
+
 ## 外设扩展规则
 
 新增外设时，优先只改这三层：
@@ -95,6 +114,17 @@ Frontend -> /api/agent/chat -> ObservationService -> internal/agent -> Model API
 不要先改前端。
 
 用户前端不感知外设调试细节，debug 前端专门承接状态展示。
+
+## ROS2 注册最短路径
+
+想让 agent 接入一个新的 ROS2 topic 设备，默认按这条路走：
+
+1. 复制 [ros2_topic_device.example.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/snippets/ros2_topic_device.example.json) 到 [peripherals.json](/home/sealessland/inference/eino-vlm-agent-demo/configs/peripherals.json) 的 `devices` 里。
+2. 只改 `name`、`topic`、`message_type`、`ros_setup`，必要时再改 `encoding`。
+3. 在 ROS2 机器上构建 helper：`./manage_jetson_camera_agent.sh build-ros2-helper`
+4. 启动服务后，先看 `/api/peripherals`，再用 `ros2_topic_read(mode=list/inspect/capture)` 验证。
+
+这条路径刻意保持在 `configs -> internal/peripherals -> docs` 三层内，避免为了注册一个 topic 去改 agent 主链路。
 
 ## AI 修改建议
 

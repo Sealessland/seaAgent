@@ -1,4 +1,4 @@
-package main
+package jetsonagent
 
 import (
 	"bufio"
@@ -21,7 +21,6 @@ type appConfig struct {
 	UITitle          string
 	UIDescription    string
 	Workdir          string
-	CameraScript     string
 	PeripheralConfig string
 	FrontendDistDir  string
 	DebugDistDir     string
@@ -45,7 +44,6 @@ func loadConfig() (appConfig, error) {
 		UITitle:          requiredEnv("JETSON_UI_TITLE"),
 		UIDescription:    requiredEnv("JETSON_UI_DESCRIPTION"),
 		Workdir:          envOrDefault("JETSON_AGENT_WORKDIR", filepath.Join(os.TempDir(), "jetson-camera-agent")),
-		CameraScript:     envOrDefault("JETSON_CAMERA_SCRIPT", "./scripts/capture_zed_frame.py"),
 		PeripheralConfig: envOrDefault("JETSON_PERIPHERAL_CONFIG", "./configs/peripherals.json"),
 		FrontendDistDir:  envOrDefault("JETSON_FRONTEND_DIST_DIR", "./front-end/dist"),
 		DebugDistDir:     envOrDefault("JETSON_DEBUG_DIST_DIR", "./debug-front-end/dist"),
