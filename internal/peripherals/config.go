@@ -21,6 +21,7 @@ type DeviceConfig struct {
 }
 
 type CaptureConfig struct {
+	Binary         string   `json:"binary,omitempty"`
 	Script         string   `json:"script,omitempty"`
 	Command        []string `json:"command,omitempty"`
 	Topic          string   `json:"topic,omitempty"`

@@ -8,8 +8,6 @@ import (
 	"eino-vlm-agent-demo/internal/camera"
 )
 
-const defaultROS2CaptureScript = "./scripts/capture_ros2_topic_image.py"
-
 type ros2TopicDevice struct {
 	cfg DeviceConfig
 }
@@ -29,10 +27,11 @@ func newROS2TopicDevice(cfg DeviceConfig) (Device, error) {
 	if strings.TrimSpace(execDevice.cfg.Capture.MessageType) == "" {
 		return nil, fmt.Errorf("ros2_topic device %q requires capture.message_type", cfg.Name)
 	}
-	if strings.TrimSpace(execDevice.cfg.Capture.Script) == "" {
-		execDevice.cfg.Capture.Script = defaultROS2CaptureScript
+	if strings.TrimSpace(execDevice.cfg.Capture.Binary) == "" && strings.TrimSpace(execDevice.cfg.Capture.Script) == "" {
+		execDevice.cfg.Capture.Binary = camera.DefaultROS2CaptureBinaryPath()
 	}
 	if err := camera.ValidateROS2TopicCaptureConfig(camera.ROS2TopicCaptureConfig{
+		BinaryPath:     execDevice.cfg.Capture.Binary,
 		ScriptPath:     execDevice.cfg.Capture.Script,
 		Topic:          execDevice.cfg.Capture.Topic,
 		MessageType:    execDevice.cfg.Capture.MessageType,
@@ -82,6 +81,7 @@ func (d *ros2TopicDevice) Inspect(ctx context.Context) DeviceSnapshot {
 
 func (d *ros2TopicDevice) Capture(ctx context.Context, outputPath string) (*CaptureResult, error) {
 	return camera.CaptureROS2Topic(ctx, camera.ROS2TopicCaptureConfig{
+		BinaryPath:     d.cfg.Capture.Binary,
 		ScriptPath:     d.cfg.Capture.Script,
 		Topic:          d.cfg.Capture.Topic,
 		MessageType:    d.cfg.Capture.MessageType,
@@ -95,6 +95,24 @@ func defaultROS2TopicChecks(capture *CaptureConfig) []CheckConfig {
 	if capture == nil {
 		return nil
 	}
+	if usesLegacyROS2PythonCapture(capture) {
+		return []CheckConfig{
+			{
+				Name:    "topic_list",
+				Command: ros2ShellCommand(capture.ROSSetup, "ros2 topic list 2>/dev/null | grep '^"+shellSingleQuoteForGrep(capture.Topic)+"$' || true"),
+			},
+			{
+				Name:    "topic_info",
+				Command: ros2ShellCommand(capture.ROSSetup, "ros2 topic info "+shellQuote(capture.Topic)+" 2>/dev/null || true"),
+			},
+			{
+				Name:    "python_deps",
+				Command: ros2ShellCommand(capture.ROSSetup, "python3 -c \"import rclpy, cv_bridge, sensor_msgs.msg, numpy, cv2; print('ros2_python_ok')\" 2>/dev/null || true"),
+			},
+		}
+	}
+
+	helper := resolveROS2CaptureHelper(capture)
 	return []CheckConfig{
 		{
 			Name:    "topic_list",
@@ -105,8 +123,8 @@ func defaultROS2TopicChecks(capture *CaptureConfig) []CheckConfig {
 			Command: ros2ShellCommand(capture.ROSSetup, "ros2 topic info "+shellQuote(capture.Topic)+" 2>/dev/null || true"),
 		},
 		{
-			Name:    "python_deps",
-			Command: ros2ShellCommand(capture.ROSSetup, "python3 -c \"import rclpy, cv_bridge, sensor_msgs.msg, numpy, cv2; print('ros2_python_ok')\" 2>/dev/null || true"),
+			Name:    "capture_helper",
+			Command: ros2ShellCommand(capture.ROSSetup, shellQuote(helper)+" --probe 2>/dev/null || true"),
 		},
 	}
 }
@@ -115,26 +133,41 @@ func summarizeROS2TopicChecks(capture *CaptureConfig, outputs map[string]string)
 	if capture == nil {
 		return "ROS2 topic capture is not configured."
 	}
+	if usesLegacyROS2PythonCapture(capture) {
+		switch {
+		case strings.TrimSpace(outputs["python_deps"]) == "" || outputs["python_deps"] == "(empty)":
+			return "ROS2 topic path is configured, but Python ROS2 image dependencies are unavailable."
+		case strings.TrimSpace(outputs["topic_list"]) == "" || outputs["topic_list"] == "(empty)":
+			return "ROS2 image topic is configured, but the topic is not currently visible in the ROS graph."
+		case strings.TrimSpace(outputs["topic_info"]) != "" && outputs["topic_info"] != "(empty)":
+			return "ROS2 image topic is visible and capture can be attempted through a subscriber."
+		default:
+			return "ROS2 topic capture is configured, but topic metadata is incomplete."
+		}
+	}
 	switch {
-	case strings.TrimSpace(outputs["python_deps"]) == "" || outputs["python_deps"] == "(empty)":
-		return "ROS2 topic path is configured, but Python ROS2 image dependencies are unavailable."
+	case strings.TrimSpace(outputs["capture_helper"]) == "" || outputs["capture_helper"] == "(empty)" || !strings.Contains(outputs["capture_helper"], "rclgo_ready"):
+		return "ROS2 topic path is configured, but the rclgo capture helper is unavailable."
 	case strings.TrimSpace(outputs["topic_list"]) == "" || outputs["topic_list"] == "(empty)":
 		return "ROS2 image topic is configured, but the topic is not currently visible in the ROS graph."
 	case strings.TrimSpace(outputs["topic_info"]) != "" && outputs["topic_info"] != "(empty)":
-		return "ROS2 image topic is visible and capture can be attempted through a subscriber."
+		return "ROS2 image topic is visible and capture can be attempted through the rclgo subscriber."
 	default:
 		return "ROS2 topic capture is configured, but topic metadata is incomplete."
 	}
 }
 
 func ros2TopicMetadata(cfg DeviceConfig) map[string]string {
-	metadata := make(map[string]string, len(cfg.Metadata)+4)
+	metadata := make(map[string]string, len(cfg.Metadata)+5)
 	for key, value := range cfg.Metadata {
 		metadata[key] = value
 	}
 	if cfg.Capture != nil {
 		metadata["topic"] = cfg.Capture.Topic
 		metadata["message_type"] = cfg.Capture.MessageType
+		if helper := strings.TrimSpace(resolveROS2CaptureHelper(cfg.Capture)); helper != "" {
+			metadata["capture_helper"] = helper
+		}
 		if strings.TrimSpace(cfg.Capture.Encoding) != "" {
 			metadata["encoding"] = cfg.Capture.Encoding
 		}
@@ -143,6 +176,26 @@ func ros2TopicMetadata(cfg DeviceConfig) map[string]string {
 		}
 	}
 	return metadata
+}
+
+func usesLegacyROS2PythonCapture(capture *CaptureConfig) bool {
+	if capture == nil {
+		return false
+	}
+	return camera.UsesLegacyROS2TopicScript(camera.ROS2TopicCaptureConfig{
+		BinaryPath: capture.Binary,
+		ScriptPath: capture.Script,
+	})
+}
+
+func resolveROS2CaptureHelper(capture *CaptureConfig) string {
+	if capture == nil {
+		return camera.DefaultROS2CaptureBinaryPath()
+	}
+	return camera.ResolveROS2TopicCapturePath(camera.ROS2TopicCaptureConfig{
+		BinaryPath: capture.Binary,
+		ScriptPath: capture.Script,
+	})
 }
 
 func ros2ShellCommand(setup []string, body string) []string {

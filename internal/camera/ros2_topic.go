@@ -11,7 +11,10 @@ import (
 	"strings"
 )
 
+const defaultROS2CaptureBinary = "./ros2_topic_capture"
+
 type ROS2TopicCaptureConfig struct {
+	BinaryPath     string
 	ScriptPath     string
 	Topic          string
 	MessageType    string
@@ -61,8 +64,13 @@ func buildROS2CaptureCommand(cfg ROS2TopicCaptureConfig, outputPath string) stri
 		builder.WriteString(shellQuote(trimmed))
 		builder.WriteString(" >/dev/null 2>&1; ")
 	}
-	builder.WriteString("exec python3 ")
-	builder.WriteString(shellQuote(cfg.ScriptPath))
+	if UsesLegacyROS2TopicScript(cfg) {
+		builder.WriteString("exec python3 ")
+		builder.WriteString(shellQuote(cfg.ScriptPath))
+	} else {
+		builder.WriteString("exec ")
+		builder.WriteString(shellQuote(ResolveROS2TopicCapturePath(cfg)))
+	}
 	builder.WriteString(" --output ")
 	builder.WriteString(shellQuote(outputPath))
 	builder.WriteString(" --topic ")
@@ -78,6 +86,25 @@ func buildROS2CaptureCommand(cfg ROS2TopicCaptureConfig, outputPath string) stri
 		builder.WriteString(strconv.Itoa(cfg.TimeoutSeconds))
 	}
 	return builder.String()
+}
+
+func DefaultROS2CaptureBinaryPath() string {
+	return defaultROS2CaptureBinary
+}
+
+func UsesLegacyROS2TopicScript(cfg ROS2TopicCaptureConfig) bool {
+	path := strings.TrimSpace(cfg.ScriptPath)
+	return path != "" && strings.HasSuffix(strings.ToLower(path), ".py")
+}
+
+func ResolveROS2TopicCapturePath(cfg ROS2TopicCaptureConfig) string {
+	if path := strings.TrimSpace(cfg.BinaryPath); path != "" {
+		return path
+	}
+	if path := strings.TrimSpace(cfg.ScriptPath); path != "" && !strings.HasSuffix(strings.ToLower(path), ".py") {
+		return path
+	}
+	return defaultROS2CaptureBinary
 }
 
 func shellQuote(value string) string {
@@ -97,8 +124,6 @@ func ExpandHomePath(path string) string {
 
 func ValidateROS2TopicCaptureConfig(cfg ROS2TopicCaptureConfig) error {
 	switch {
-	case strings.TrimSpace(cfg.ScriptPath) == "":
-		return fmt.Errorf("ros2 capture script path is empty")
 	case strings.TrimSpace(cfg.Topic) == "":
 		return fmt.Errorf("ros2 capture topic is empty")
 	case strings.TrimSpace(cfg.MessageType) == "":
